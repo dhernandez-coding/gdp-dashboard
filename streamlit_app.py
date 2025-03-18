@@ -274,6 +274,6 @@ with st.expander("View Team Hours Data"):
 
 with st.expander("View Individual Hours Data"):
     st.dataframe(individual_hours.style.format({"Total_Hours": "{:,.0f}"}))
-
+st.subheader("Data Tables", divider="gray")
 # st.markdown("---")
 # st.markdown(f"<h6 style='text-align: center; color: {DARK_BLUE};'>Built with ❤️ in Streamlit</h6>", unsafe_allow_html=True)
