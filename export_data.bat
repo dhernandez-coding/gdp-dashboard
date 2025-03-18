@@ -1,23 +1,35 @@
 @echo off
-echo Starting SQL Data Export...
+echo Starting SQL Data Export Using Python...
 
-:: Define the SQL Server name
-set SQLSERVER=RLGOKC-DB01
+:: Define Paths
+set SCRIPT_DIR=C:\Users\v_rroberson\Report RLG\gdp-dashboard
+set SCRIPT_FILE=ExportSQLPython.py
+set FULL_SCRIPT_PATH="%SCRIPT_DIR%\%SCRIPT_FILE%"
 
-:: Define the output folder
-set EXPORT_PATH="C:\Users\v_rroberson\Report RLG\gdp-dashboard\data"
+:: Verify the Script Exists
+if not exist %FULL_SCRIPT_PATH% (
+    echo Error: Python script not found at %FULL_SCRIPT_PATH%
+   
+    exit /b 1
+)
 
-:: Export rpt.vMatters
-echo Exporting vMatters...
-bcp "SELECT * FROM DW.rpt.vMatters" queryout %EXPORT_PATH%\vMatters.csv -c -t, -T -S %SQLSERVER%
+:: Navigate to the Script Directory
+cd /d "%SCRIPT_DIR%" || (
+    echo Error: Failed to navigate to script directory.
 
-:: Export RevShareNewLogic
-echo Exporting RevShareNewLogic...
-bcp "SELECT * FROM DW.dbo.RevShareNewLogic" queryout %EXPORT_PATH%\RevShareNewLogic.csv -c -t, -T -S %SQLSERVER%
+    exit /b 1
+)
 
-:: Export vBillableHoursStaff
-echo Exporting vBillableHoursStaff...
-bcp "SELECT * FROM DW.dbo.vBillableHoursStaff" queryout %EXPORT_PATH%\vBillableHoursStaff.csv -c -t, -T -S %SQLSERVER%
+:: Run Python Script
+python %SCRIPT_FILE%
 
-echo Export completed!
+:: Check Execution Status
+if %errorlevel% neq 0 (
+    echo Error: Python script execution failed.
+   
+    exit /b 1
+)
+
+echo ✅ SQL Data Export Completed Successfully!
+
 exit /b 0
