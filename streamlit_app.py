@@ -2,13 +2,19 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
+import datetime
+
+# ✅ Set default date range (One year ago to today)
+today = pd.Timestamp.today()
+default_start_date = today - pd.DateOffset(years=1)
+default_end_date = today - pd.DateOffset(days=2)
 
 # ✅ Define Colors
 PRIMARY_COLOR = "#399db7"  # Light blue
 DARK_BLUE = "#052b48"      # Dark blue
 COMPLEMENTARY_COLOR1 = "#FF6F61"  # Coral (for differentiation)
 COMPLEMENTARY_COLOR2 = "#F4A261"  # Warm orange (for better contrast)
-logo_path = Path(__file__).parent / "data" / "resolution.png"
+
 # ✅ Set Streamlit Page Config
 st.set_page_config(
     page_title="Time Entry Dashboard",
@@ -16,29 +22,37 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load Data Function
-@st.cache_data
+# ✅ Load Data Function
+@st.cache_data(ttl=86400)  # Cache expires after 86400 seconds (24 hours)
 def load_data():
-    """Load datasets from the /data folder."""
+    """Load datasets from the /data folder and preprocess dates."""
     data_path = Path(__file__).parent / "data"
 
-    staff_revenue = pd.read_csv(data_path / "staff_revenue.csv")
-    team_hours = pd.read_csv(data_path / "team_hours.csv")
-    individual_hours = pd.read_csv(data_path / "individual_hours.csv")
+    # Load CSVs
+    revenue = pd.read_csv(data_path / "RevShareNewLogic.csv", parse_dates=["RevShareDate"])
+    billable_hours = pd.read_csv(data_path / "vBillableHoursStaff.csv", parse_dates=["BillableHoursDate"])
+    matters = pd.read_csv(data_path / "vMatters.csv", parse_dates=["MatterCreationDate"])
 
-    # Convert Date Columns
-    individual_hours["WeekStartDate"] = pd.to_datetime(individual_hours["WeekStartDate"])
+    # ✅ Apply Date Transformations Once (for efficiency)
+    billable_hours["Month"] = billable_hours["BillableHoursDate"].dt.to_period("M").astype(str)
+    billable_hours["Week"] = billable_hours["BillableHoursDate"] - pd.to_timedelta(billable_hours["BillableHoursDate"].dt.dayofweek, unit="D")
 
-    return staff_revenue, team_hours, individual_hours
+    revenue["Month"] = revenue["RevShareDate"].dt.to_period("M").astype(str)
+    revenue["Week"] = revenue["RevShareDate"] - pd.to_timedelta(revenue["RevShareDate"].dt.dayofweek, unit="D")
+
+    matters["Week"] = matters["MatterCreationDate"] - pd.to_timedelta(matters["MatterCreationDate"].dt.dayofweek, unit="D")
+
+    return revenue, billable_hours, matters
 
 # Load data
-staff_revenue, team_hours, individual_hours = load_data()
+revenue, billable_hours, matters = load_data()
+
+# ✅ Predefined Staff List (Always Show These)
+custom_staff_list = ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "WMJ"]
 
 # ----------------------------------------------------------------------------
-# HEADER WITH COMPANY LOGO
+# ✅ HEADER WITH COMPANY LOGO
 header_bg_color = "#052b48"  # Dark blue background for header
-logo_path = Path(__file__).parent / "data" / "resolution.png"
-
 st.markdown(
     f"""
     <div style="background-color:{header_bg_color}; padding:20px; text-align:center; border-radius:5px;">
@@ -48,232 +62,313 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Now Display the Logo Properly
-if logo_path.exists():
-    st.image(str(logo_path), width=200)
-else:
-    st.warning("Logo not found! Please check that 'resolution.png' is inside the 'data' folder.")
-
 st.markdown("---")
 
 # ----------------------------------------------------------------------------
-# ✅ KPI METRICS (Simplified)
+# ✅ DATE FILTER
+st.sidebar.header("Filter Data by Date")
+min_date = min(revenue["RevShareDate"].min(), billable_hours["BillableHoursDate"].min(), matters["MatterCreationDate"].min())
+if min_date < pd.Timestamp("2020-01-01"):
+    min_date = pd.Timestamp("2020-01-01")
+max_date = max(revenue["RevShareDate"].max(), billable_hours["BillableHoursDate"].max(), matters["MatterCreationDate"].max())
+
+# ✅ Let users select the date range, but default to last year
+date_range = st.sidebar.date_input(
+    "Select Date Range",
+    [default_start_date, default_end_date],  # ✅ Default range: 1 year ago to today
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Convert to Timestamp for filtering
+start_date = pd.Timestamp(date_range[0])
+end_date = pd.Timestamp(date_range[1])
+
+# Apply date filter to all datasets
+filtered_revenue = revenue[(revenue["RevShareDate"] >= start_date) & (revenue["RevShareDate"] <= end_date)]
+filtered_team_hours = billable_hours[(billable_hours["BillableHoursDate"] >= start_date) & (billable_hours["BillableHoursDate"] <= end_date)]
+filtered_matters = matters[(matters["MatterCreationDate"] >= start_date) & (matters["MatterCreationDate"] <= end_date)]
+# ✅ Filter matters created within the selected year-to-date range
+filtered_matters_ytd = filtered_matters[
+    (filtered_matters["MatterCreationDate"] >= pd.Timestamp(start_date.year, 1, 1)) &
+    (filtered_matters["MatterCreationDate"] <= end_date)
+]
+
+# ✅ Ensure Correct Column Naming (Rename StaffAbbreviation to Staff)
+filtered_team_hours = filtered_team_hours.rename(columns={"StaffAbbreviation": "Staff"})
+filtered_revenue = filtered_revenue.rename(columns={"StaffAbbreviation": "Staff"})
+
+# ✅ Filter Data to Include Only Predefined Staff
+filtered_team_hours = filtered_team_hours[filtered_team_hours["Staff"].isin(custom_staff_list)]
+filtered_revenue = filtered_revenue[filtered_revenue["Staff"].isin(custom_staff_list)]
+
+st.markdown("---")
+# ----------------------------------------------------------------------------
+## Transformating data 
+# ✅ Convert Dates for Monthly Aggregation
+filtered_revenue["Month"] = filtered_revenue["RevShareDate"].dt.to_period("M").astype(str)
+filtered_team_hours["Month"] = filtered_team_hours["BillableHoursDate"].dt.to_period("M").astype(str)
+
+# ✅ Convert Dates for Weekly Aggregation
+filtered_revenue["Week"] = filtered_revenue["RevShareDate"] - pd.to_timedelta(filtered_revenue["RevShareDate"].dt.dayofweek, unit="D")
+filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
+
+# ✅ Identify the Last Selected Month from Date Slider
+last_selected_month = max(filtered_revenue["Month"])  # Last selected month
+
+# ✅ 1️⃣ Revenue Per Staff (Monthly)
+revenue_per_staff_monthly = filtered_revenue.groupby(["Month", "Staff"], as_index=False)["RevShareTotal"].sum()
+
+# ✅ 2️⃣ Total Team Revenue (Monthly)
+total_team_revenue_monthly = revenue_per_staff_monthly.groupby("Month", as_index=False)["RevShareTotal"].sum()
+
+# ✅ 3️⃣ Billable Hours Per Staff (Weekly)
+billable_hours_per_staff_weekly = filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
+
+# ✅ 4️⃣ Billable Hours Per Staff (Monthly)
+billable_hours_per_staff_monthly = filtered_team_hours.groupby(["Month", "Staff"], as_index=False)["BillableHoursAmount"].sum()
+
+# ✅ 5️⃣ Total Team Billable Hours (Weekly)
+total_team_hours_weekly = billable_hours_per_staff_weekly.groupby("Week", as_index=False)["BillableHoursAmount"].sum()
+
+# ✅ 6️⃣ Total Team Billable Hours (Monthly)
+total_team_hours_monthly = billable_hours_per_staff_monthly.groupby("Month", as_index=False)["BillableHoursAmount"].sum()
+# ✅ Convert MatterCreationDate to Weekly Period
+filtered_matters_ytd["Week"] = filtered_matters_ytd["MatterCreationDate"] - pd.to_timedelta(filtered_matters_ytd["MatterCreationDate"].dt.dayofweek, unit="D")
+
+# ----------------------------------------------------------------------------
+# ✅ KPI METRICS (Dynamically Updating)
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Revenue", f"${staff_revenue['YTD_Actual'].sum():,.0f}")
-col2.metric("Total Team Hours", f"{team_hours['Total_Hours'].sum():,.0f} hours")
-col3.metric("Avg Weekly Hours", f"{individual_hours.groupby('WeekStartDate')['Total_Hours'].mean().mean():,.1f} hours")
+col1.metric("Total Revenue", f"${filtered_revenue['RevShareTotal'].sum():,.0f}")
+col2.metric("Total Team Hours", f"{filtered_team_hours['BillableHoursAmount'].sum():,.0f} hours")
+col3.metric("Total Matters", f"{filtered_matters.shape[0]:,.0f} matters")
 
 st.markdown("---")
 
 # ----------------------------------------------------------------------------
-# ✅ STAFF REVENUE (BAR CHART WITH DISTINCT COLORS)
-st.subheader("YTD Revenue per Staff", divider="gray")
-
-st.markdown(
-    """
-    <style>
-        /* Change background and text color of selected options */
-        span[data-baseweb="tag"] {
-            background-color: #052b48 !important;  /* Dark Blue */
-            color: white !important;
-            border-radius: 8px;
-            padding: 5px 10px;
-        }
-
-        /* Change hover effect for selected items */
-        span[data-baseweb="tag"]:hover {
-            background-color: #399db7 !important; /* Light Blue */
-            color: white !important;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-selected_staff = st.multiselect(
-    "Filter by Staff:",
-    staff_revenue["Staff"].unique(),
-    default=staff_revenue["Staff"].unique()
-)
-
-filtered_revenue = staff_revenue[staff_revenue["Staff"].isin(selected_staff)]
-
-
-fig1 = px.bar(
-    filtered_revenue,
-    x="Staff",
-    y="YTD_Actual",
-    color="Staff",
-    title="YTD Revenue per Staff",
-    labels={"YTD_Actual": "Revenue ($)"},
-    color_discrete_sequence=[PRIMARY_COLOR]
-)
-
-fig1.add_hline(
-    y=300000,  # Y-Axis Position for the threshold
-    line_dash="dash",  # Makes it a dashed line
-    line_color=COMPLEMENTARY_COLOR1,  # Coral color for visibility
-    annotation_text="Target: $300K",  # Label for the line
-    annotation_position="top left",
-    annotation_font_size=12,
-    annotation_font_color=COMPLEMENTARY_COLOR1
-)
-
-fig1.update_layout(
-    xaxis_title="", 
-    yaxis_title="Revenue ($)", 
-    showlegend=False
-)
-
-st.plotly_chart(fig1, use_container_width=True)
-
-# ----------------------------------------------------------------------------
-# ✅ MONTHLY TEAM HOURS (BAR CHART WITH THRESHOLD LINE)
-st.subheader("Team Hours per Month", divider="gray")
-
-# ✅ Month Mapping (Numbers → Strings)
-MONTHS_MAP = {
-    1: "January", 2: "February", 3: "March", 4: "April",
-    5: "May", 6: "June", 7: "July", 8: "August",
-    9: "September", 10: "October", 11: "November", 12: "December"
-}
-
-# ✅ Reverse Mapping for Filtering (Strings → Numbers)
-REVERSE_MONTHS_MAP = {v: k for k, v in MONTHS_MAP.items()}
-
-# ✅ Get Min & Max Month Numbers from Data
-min_month = int(team_hours["Month"].min())
-max_month = int(team_hours["Month"].max())
-
-# ✅ Convert Month Numbers to Labels for Display
-month_labels = [MONTHS_MAP[i] for i in range(min_month, max_month + 1)]
-
-# ✅ Custom Slider Using Month Names
-selected_months = st.select_slider(
-    "Select a month range:",
-    options=month_labels,  # Display month names instead of numbers
-    value=(month_labels[0], month_labels[-1])  # Default range: first to last month
-)
-
-# ✅ Convert Selected Month Names Back to Numbers for Filtering
-selected_min_month = REVERSE_MONTHS_MAP[selected_months[0]]
-selected_max_month = REVERSE_MONTHS_MAP[selected_months[1]]
-
-# ✅ Filter Data Based on Selected Months
-filtered_team_hours = team_hours[
-    (team_hours["Month"] >= selected_min_month) & (team_hours["Month"] <= selected_max_month)
-].copy()
-
-# ✅ Map Month Numbers to Names for Proper Labels
-filtered_team_hours["Month_Name"] = filtered_team_hours["Month"].map(MONTHS_MAP)
-
-# ✅ Create Plotly Bar Chart
-fig2 = px.bar(
-    filtered_team_hours,
-    x="Month_Name",  # Now using month names instead of numbers
-    y="Total_Hours",
-    title="Total Team Hours by Month",
-    labels={"Total_Hours": "Hours Worked", "Month_Name": "Month"},
-    color_discrete_sequence=["#052b48"]  # Dark Blue Bars
-)
-
-# ✅ Add Threshold Line at 910 Hours
-fig2.add_hline(
-    y=910,
-    line_dash="dash",
-    line_color="red",
-    annotation_text="Threshold: 910 Hours",
-    annotation_position="top left"
-)
-
-fig2.update_layout(
-    xaxis_title="Month", 
-    yaxis_title="Total Hours"
-)
-
-# ✅ Display in Streamlit
-st.plotly_chart(fig2, use_container_width=True)
-
-# ----------------------------------------------------------------------------
-
-# ✅ WEEKLY INDIVIDUAL HOURS (LINE CHART)
-st.subheader("Individual Hours by Week", divider="gray")
-
-selected_staff_weekly = st.multiselect("Select Staff:", individual_hours["Staff"].unique(), default=individual_hours["Staff"].unique()[:5])
-
-filtered_individual_hours = individual_hours[individual_hours["Staff"].isin(selected_staff_weekly)]
-
-fig3 = px.line(
-    filtered_individual_hours,
-    x="WeekStartDate",
-    y="Total_Hours",
-    color="Staff",
-    markers=True,
-    title="Weekly Individual Hours",
-    labels={"WeekStartDate": "Week", "Total_Hours": "Hours Worked"}
-)
-fig3.update_layout(
-    xaxis_title="Week", 
-    yaxis_title="Total Hours"
-)
-
-st.plotly_chart(fig3, use_container_width=True)
-
-# individual_hours_2024 = individual_hours[individual_hours["WeekStartDate"].dt.year == 2024]
-# staff_revenue_2024 = staff_revenue[staff_revenue["Year"] == 2024]
-
-# ✅ Weekly Aggregation for Team Hours (2024)
-weekly_hours_agg = individual_hours.groupby("WeekStartDate", as_index=False)["Total_Hours"].sum()
-
-# ✅ Monthly Aggregation for YTD Revenue (Cumulative)
-staff_revenue["Month"] = pd.to_datetime(staff_revenue["Month"], format="%m")  # Ensure Month is datetime
-monthly_revenue_agg = staff_revenue.groupby("Month", as_index=False)["YTD_Actual"].sum()
-monthly_revenue_agg["YTD_Cumulative"] = monthly_revenue_agg["YTD_Actual"].cumsum()  # Compute cumulative revenue
-
-# ✅ Side-by-Side Layout for New Charts
-st.subheader("2024 Weekly Team Hours & YTD Revenue", divider="gray")
+# ✅ WEEKLY TEAM HOURS & YTD REVENUE CHARTS
+st.subheader("Weekly Team Hours & YTD Revenue", divider="gray")
 col1, col2 = st.columns(2)
-
-# 🎯 PLOT 1: 2024 Weekly Team Hours (Bar Chart)
+# Filter only prior months
+prior_months_team_hours = total_team_hours_monthly[total_team_hours_monthly["Month"] < last_selected_month]
+# ✅ Convert BillableHoursDate to Weekly Period & Aggregate
+# 🎯 PLOT 1: Cumulative Revenue (Bar Chart)
 with col1:
-    fig_weekly_hours = px.bar(
-        weekly_hours_agg,
-        x="WeekStartDate",
-        y="Total_Hours",
-        title="2024 Weekly Team Hours",
-        labels={"WeekStartDate": "Week", "Total_Hours": "Hours Worked"},
+    # ✅ REVENUE PER STAFF (Bar Chart)
+
+
+    fig1 = px.bar(
+        filtered_revenue,
+        x="Staff",
+        y="RevShareTotal",
+        color="Staff",
+        title="Revenue per Staff",
+        labels={"RevShareTotal": "Revenue ($)"},
+        color_discrete_sequence=[PRIMARY_COLOR]
+    )
+
+    fig1.update_layout(xaxis_title="", yaxis_title="Revenue ($)", showlegend=False)
+    st.plotly_chart(fig1, use_container_width=True)
+
+
+
+# 🎯 PLOT 2: prior_team_hours (Bar Chart)
+with col2:
+
+    fig_prior_team_hours = px.bar(
+        prior_months_team_hours,  # ✅ Filtered dataset
+        x="Month",
+        y="BillableHoursAmount",
+        title="Team Hours - Prior Months",
+        labels={"Month": "Month", "BillableHoursAmount": "Hours Worked"},
         color_discrete_sequence=[DARK_BLUE]
     )
-    fig_weekly_hours.update_layout(xaxis_title="Week", yaxis_title="Hours Worked")
-    st.plotly_chart(fig_weekly_hours, use_container_width=True)
 
-# 🎯 PLOT 2: 2024 YTD Revenue (Cumulative Line Chart)
-with col2:
-    fig_ytd_revenue = px.line(
-        monthly_revenue_agg,
-        x="Month",
-        y="YTD_Cumulative",
-        markers=True,
-        title="2024 YTD Revenue (Cumulative)",
-        labels={"YTD_Cumulative": "Cumulative Revenue ($)", "Month": "Month"},
-        color_discrete_sequence=[COMPLEMENTARY_COLOR1]
+    fig_prior_team_hours.update_layout(
+        xaxis_title="Month",
+        yaxis_title="Hours Worked",
+        xaxis=dict(tickmode="array", tickvals=prior_months_team_hours["Month"])
     )
-    fig_ytd_revenue.update_layout(xaxis_title="Month", yaxis_title="Cumulative Revenue ($)")
-    st.plotly_chart(fig_ytd_revenue, use_container_width=True)
+
+    st.plotly_chart(fig_prior_team_hours, use_container_width=True)
+
 
 
 # ----------------------------------------------------------------------------
-# ✅ EXPANDABLE RAW DATA TABLES (TITLES IN DARK BLUE)
-st.subheader("Data Tables", divider="gray")
+# ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart)
+st.subheader("Weekly Individual Hours", divider="gray")
 
-with st.expander("View Staff Revenue Data"):
-    st.dataframe(staff_revenue.style.format({"YTD_Actual": "${:,.0f}"}))
+# ✅ Convert BillableHoursDate to Weekly Period & Aggregate
+filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
 
-with st.expander("View Team Hours Data"):
-    st.dataframe(team_hours.style.format({"Total_Hours": "{:,.0f}"}))
+# ✅ Aggregate by Week and Staff
+weekly_individual_hours = filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
 
-with st.expander("View Individual Hours Data"):
-    st.dataframe(individual_hours.style.format({"Total_Hours": "{:,.0f}"}))
+# ✅ Compute Weekly Average Daily Hours (Total Weekly Hours / 5)
+weekly_individual_hours["AvgDailyHours"] = weekly_individual_hours["BillableHoursAmount"] / 5
 
-st.markdown("---")
-# st.markdown(f"<h6 style='text-align: center; color: {DARK_BLUE};'>Built with ❤️ in Streamlit</h6>", unsafe_allow_html=True)
+# ✅ Create Grouped Bar Chart with Enhanced Tooltip
+fig_individual_hours_bar = px.bar(
+    weekly_individual_hours,
+    x="Week",
+    y="BillableHoursAmount",
+    color="Staff",
+    title="Weekly Individual Hours Worked",
+    labels={"BillableHoursAmount": "Total Hours Worked", "Week": "Week Start", "Staff": "Staff Member"},
+    color_discrete_sequence=px.colors.qualitative.Set1,
+    barmode="group",
+    hover_data={"AvgDailyHours": ":.2f"}  # ✅ Show Avg Daily Hours in Tooltip (formatted to 2 decimals)
+)
+
+fig_individual_hours_bar.update_layout(
+    xaxis_title="Week",
+    yaxis_title="Total Hours Worked",
+    xaxis=dict(tickformat="%Y-%m-%d"),  # ✅ Format weeks properly
+)
+
+# ✅ Display the Chart in Streamlit
+st.plotly_chart(fig_individual_hours_bar, use_container_width=True)
+# ----------------------------------------------------------------------------
+
+
+col11, col22 = st.columns(2)
+
+with col11:
+    # Weekly Team Hours Chart
+    fig_weekly_hours = px.bar(
+    total_team_hours_weekly,  # ✅ Use the correct dataset
+    x="Week",
+    y="BillableHoursAmount",
+    title="Weekly Team Hours",
+    labels={"Week": "Week Start", "BillableHoursAmount": "Hours Worked"},
+    color_discrete_sequence=[DARK_BLUE]
+)
+
+    fig_weekly_hours.update_layout(
+    xaxis_title="Week",
+    yaxis_title="Hours Worked",
+    xaxis=dict(tickformat="%Y-%m-%d")  # Format dates for better readability
+)
+    st.plotly_chart(fig_weekly_hours, use_container_width=True)
+      
+with col22:
+        
+        fig_ytd_revenue = px.bar(
+        total_team_revenue_monthly,  # ✅ Use the correct dataset
+        x="Month",
+        y="RevShareTotal",  # ✅ Ensure correct column is used for revenue
+        title="YTD Revenue (Cumulative)",
+        labels={"RevShareTotal": "Cumulative Revenue ($)", "Month": "Month"},
+        color_discrete_sequence=[COMPLEMENTARY_COLOR1]
+    )
+
+        fig_ytd_revenue.update_layout(
+        xaxis_title="Month",
+        yaxis_title="Cumulative Revenue ($)",
+        xaxis=dict(tickmode="array", tickvals=total_team_revenue_monthly["Month"]),
+    )
+
+        st.plotly_chart(fig_ytd_revenue, use_container_width=True)
+# ✅ MONTHLY INDIVIDUAL HOURS (Grouped Bar Chart)
+st.subheader("Monthly Individual Hours", divider="gray")
+
+# ✅ Convert BillableHoursDate to Monthly Period & Aggregate
+filtered_team_hours["Month"] = filtered_team_hours["BillableHoursDate"].dt.to_period("M").astype(str)
+monthly_individual_hours = filtered_team_hours.groupby(["Month", "Staff"], as_index=False)["BillableHoursAmount"].sum()
+
+fig_individual_hours_bar = px.bar(
+    monthly_individual_hours,
+    x="Month",
+    y="BillableHoursAmount",
+    color="Staff",
+    title="Monthly Individual Hours Worked",
+    labels={"BillableHoursAmount": "Total Hours Worked", "Month": "Month", "Staff": "Staff Member"},
+    color_discrete_sequence=px.colors.qualitative.Set1,
+    barmode="group"
+)
+
+fig_individual_hours_bar.update_layout(
+    xaxis_title="Month",
+    yaxis_title="Total Hours Worked",
+    xaxis=dict(tickmode="array", tickvals=monthly_individual_hours["Month"]),
+)
+
+st.plotly_chart(fig_individual_hours_bar, use_container_width=True)
+#-----------------------------------------------------------------------------------
+col111, col222 = st.columns(2)
+
+# ----------------------------------------------------------------------------
+with col111:
+
+    # ✅ List of staff assignment columns
+    staff_columns = ["orig_staff1", "orig_staff2", "orig_staff3"]
+
+    # ✅ Unpivot staff columns to have a single "Staff" column
+    staff_matter_data = filtered_matters_ytd.melt(
+        id_vars=["MatterCreationDate"], 
+        value_vars=staff_columns,  # ✅ Uses correct column names
+        var_name="Orig_Staff_Role", 
+        value_name="Staff"
+    )
+
+    # ✅ Remove empty staff assignments & filter only predefined staff list
+    staff_matter_data = staff_matter_data.dropna()
+    staff_matter_data = staff_matter_data[staff_matter_data["Staff"].isin(custom_staff_list)]
+
+    # ✅ Count new matters per staff
+    new_matters_per_staff = staff_matter_data.groupby("Staff", as_index=False).size()
+
+    # ✅ Create Bar Chart
+    fig_ytd_matters = px.bar(
+        new_matters_per_staff,
+        x="Staff",
+        y="size",
+        title="YTD New Matters (Per Staff)",
+        labels={"size": "New Matters", "Staff": "Staff Member"},
+        color="Staff",
+        color_discrete_sequence=px.colors.qualitative.Set1
+    )
+
+    fig_ytd_matters.update_layout(
+        xaxis_title="Staff Member",
+        yaxis_title="New Matters",
+    )
+
+    st.plotly_chart(fig_ytd_matters, use_container_width=True)
+with col222:
+
+
+    # ✅ Unpivot staff columns to have a single "Staff" column
+    weekly_staff_matter_data = filtered_matters_ytd.melt(
+        id_vars=["Week"], 
+        value_vars=staff_columns,  # ✅ Uses correct column names
+        var_name="Orig_Staff_Role", 
+        value_name="Staff"
+    )
+
+    # ✅ Remove empty staff assignments & filter only predefined staff list
+    weekly_staff_matter_data = weekly_staff_matter_data.dropna()
+    weekly_staff_matter_data = weekly_staff_matter_data[weekly_staff_matter_data["Staff"].isin(custom_staff_list)]
+
+    # ✅ Count new matters per staff per week
+    weekly_new_matters_per_staff = weekly_staff_matter_data.groupby(["Week", "Staff"], as_index=False).size()
+
+    # ✅ Create Bar Chart
+    fig_weekly_new_matters = px.bar(
+        weekly_new_matters_per_staff,
+        x="Week",
+        y="size",
+        color="Staff",
+        title="Weekly New Matters (Per Staff)",
+        labels={"size": "New Matters", "Week": "Week Start", "Staff": "Staff Member"},
+        color_discrete_sequence=px.colors.qualitative.Set1,
+        barmode="group"
+    )
+
+    fig_weekly_new_matters.update_layout(
+        xaxis_title="Week",
+        yaxis_title="New Matters",
+        xaxis=dict(tickformat="%Y-%m-%d"),  # ✅ Format weeks properly
+    )
+
+    st.plotly_chart(fig_weekly_new_matters, use_container_width=True)

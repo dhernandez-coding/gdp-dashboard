@@ -30,6 +30,6 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo ✅ SQL Data Export Completed Successfully!
+echo SQL Data Export Completed Successfully!
 
 exit /b 0
