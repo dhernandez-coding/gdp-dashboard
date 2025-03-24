@@ -72,10 +72,13 @@ if min_date < pd.Timestamp("2020-01-01"):
     min_date = pd.Timestamp("2020-01-01")
 max_date = max(revenue["RevShareDate"].max(), billable_hours["BillableHoursDate"].max(), matters["MatterCreationDate"].max())
 
-# ✅ Let users select the date range, but default to last year
+# Make sure default_start_date and default_end_date are within bounds
+default_start_date = max(default_start_date, min_date)
+default_end_date = min(default_end_date, max_date)
+
 date_range = st.sidebar.date_input(
     "Select Date Range",
-    [default_start_date, default_end_date],  # ✅ Default range: 1 year ago to today
+    [default_start_date, default_end_date],
     min_value=min_date,
     max_value=max_date
 )
