@@ -24,7 +24,8 @@ except Exception as e:
 TABLES = {
     "vMatters": "DW.rpt.vMatters",
     "RevShareNewLogic": "DW.dbo.RevShareNewLogic",
-    "vBillableHoursStaff": "DW.dbo.vBillableHoursStaff"
+    "vBillableHoursStaff": "DW.dbo.vBillableHoursStaff",
+    "vTimeEntries": "DW.dbo.vTimeEntries"
 }
 
 # ✅ Ensure Export Directory Exists
