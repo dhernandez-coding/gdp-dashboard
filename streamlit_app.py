@@ -644,4 +644,4 @@ elif page == "Settings":
     st.write(f"**Monthly hours per lawyer**: {new_hours / 12:,.2f} hours")
     st.write(f"**Weekly hours per lawyer**: {new_hours / 12 / 4:,.2f} hours")
     st.write(f"**Revenue per lawyer**: ${new_revenue / len(custom_staff_list):,.2f}")
-
+    #New changes 
