@@ -30,7 +30,7 @@ default_end_date = today - pd.DateOffset(days=2)
 treshold_hours = st.session_state["treshold_hours"]
 treshold_revenue = st.session_state["treshold_revenue"]
 
-custom_staff_list = ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "WMJ"]
+custom_staff_list = ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "TGF","KWD"]
 treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
 treshold_hours_staff_monthly = treshold_hours / 12
 treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
