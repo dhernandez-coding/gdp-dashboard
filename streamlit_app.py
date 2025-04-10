@@ -87,7 +87,7 @@ header_bg_color = "#052b48"  # Dark blue background for header
 st.markdown(
     f"""
     <div style="background-color:{header_bg_color}; padding:20px; text-align:center; border-radius:5px;">
-        <h1 style="color:white; margin-bottom:5px;">Time Entry Dashboard</h1>
+        <h1 style="color:white; margin-bottom:5px;">RLG Dashboard</h1>
     </div>
     """,
     unsafe_allow_html=True
