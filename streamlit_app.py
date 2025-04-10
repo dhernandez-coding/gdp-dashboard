@@ -46,7 +46,7 @@ logo_path = Path(__file__).parent / "data" / "resolution.png"
 
 # ✅ Set Streamlit Page Config (Favicon only works with a string path)
 st.set_page_config(
-    page_title="Time Entry Dashboard",
+    page_title="RLG Dashboard",
     page_icon=str(logo_path) if logo_path.exists() else "📊",
     layout="wide"
 )
@@ -224,7 +224,7 @@ ytd_revenue = ytd_revenue.sort_values("Month")
 ytd_revenue["MonthLabel"] = ytd_revenue["Month"].dt.strftime("%b %Y")  # Example: "Jan 2025"
 
 # ✅ Step 12: Create a goal line for $2M revenue over the year
-ytd_revenue["GoalRevenue"] = np.linspace(0, 2000000, num=12) 
+ytd_revenue["GoalRevenue"] = np.linspace(0, treshold_revenue, num=12) 
 
 
 # ----------------------------------------------------------------------------
@@ -304,7 +304,7 @@ if page == "Dashboard":
                 x=ytd_revenue["MonthLabel"], 
                 y=ytd_revenue["GoalRevenue"],
                 mode="lines",
-                name="Goal Revenue ($2M)",
+                name="Goal Revenue",
                 line=dict(color="red", dash="dash")  # Green dashed line for clarity
             )
         # ✅ Step 11: Ensure the X-axis shows **exactly 12 months**
