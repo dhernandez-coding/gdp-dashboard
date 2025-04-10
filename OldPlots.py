@@ -62,3 +62,28 @@ import streamlit as st
 
     # ✅ Display the Chart in Streamlit
     st.plotly_chart(fig_individual_hours_bar, use_container_width=True)
+
+
+#Conditional for treshold lines 
+
+        # if show_goals:
+        #     team_weekly_goal = treshold_hours_staff_weekly * len(custom_staff_list)
+        #     fig_weekly_hours.add_hline(
+        #         y=team_weekly_goal,
+        #         line_dash="dash",
+        #         line_color="red"
+        #     )
+        #     fig_weekly_hours.add_annotation(
+        #         x=total_team_hours_weekly["Week"].max(),
+        #         y=team_weekly_goal,
+        #         text=f"Team Weekly Goal: {team_weekly_goal:,.0f} hrs",
+        #         showarrow=False,
+        #         font=dict(color="red", size=12),
+        #         align="left",
+        #         bgcolor="white",
+        #         bordercolor="red",
+        #         borderwidth=1,
+        #         borderpad=4,
+        #         xanchor="left",
+        #         yanchor="bottom"
+        #     )

@@ -9,6 +9,7 @@ import json
 
 # ✅ Set default date range (One year ago to today)
 SETTINGS_FILE = Path(__file__).parent / "data" / "settings.json"
+PREBILLS_FILE = Path(__file__).parent / "data" / "prebills.json"
 def load_threshold_settings():
     if SETTINGS_FILE.exists():
         with open(SETTINGS_FILE, "r") as f:
@@ -39,7 +40,7 @@ PRIMARY_COLOR = "#399db7"  # Light blue
 DARK_BLUE = "#052b48"      # Dark blue
 COMPLEMENTARY_COLOR1 = "#FF6F61"  # Coral (for differentiation)
 COMPLEMENTARY_COLOR2 = "#F4A261"  # Warm orange (for better contrast)
-custom_palette = ["#052B48", "#4CA7ED", "#3371A1", "#265578", "#19384F"]
+custom_palette = ["#052B48", "#4CA7ED", "#3371A1", "#E3C26D", "#E3B36D"]
 
 # ✅ Define logo path
 logo_path = Path(__file__).parent / "data" / "resolution.png"
@@ -184,6 +185,12 @@ total_team_revenue_monthly["CumulativeRevenue"] = total_team_revenue_monthly["Ti
 
 # ✅ Convert MatterCreationDate to Weekly Period
 filtered_matters_ytd["Week"] = filtered_matters_ytd["MatterCreationDate"] - pd.to_timedelta(filtered_matters_ytd["MatterCreationDate"].dt.dayofweek, unit="D")
+
+# ✅ Get current and prior month based on the latest selected month
+current_month = str(pd.to_datetime(last_selected_month).to_period("M"))
+prior_month = str((pd.to_datetime(last_selected_month) - pd.DateOffset(months=1)).to_period("M"))
+
+
 #------------------------------------------YTD CALCULATIONS-------------------------------------------- 
 # ✅ Step 1: Get the selected year from `end_date`
 selected_year = end_date.year
@@ -223,10 +230,18 @@ ytd_revenue = ytd_revenue.sort_values("Month")
 # ✅ Step 11: Format month labels for better display
 ytd_revenue["MonthLabel"] = ytd_revenue["Month"].dt.strftime("%b %Y")  # Example: "Jan 2025"
 
-# ✅ Step 12: Create a goal line for $2M revenue over the year
+# ✅ Step 12: Create a goal line based on the goal set up on the settings for the year
 ytd_revenue["GoalRevenue"] = np.linspace(0, treshold_revenue, num=12) 
 
+#----Month Filtering --------------------------------------------------
+print(total_team_hours_monthly.columns)
+current_month_hours = total_team_hours_monthly.loc[
+    total_team_hours_monthly["Month"] == current_month, "BillableHoursAmount"
+].sum()
 
+prior_month_hours = total_team_hours_monthly.loc[
+    total_team_hours_monthly["Month"] == prior_month, "BillableHoursAmount"
+].sum()
 # ----------------------------------------------------------------------------
 if page == "Dashboard":
 
@@ -235,8 +250,8 @@ if page == "Dashboard":
     total_revenue = filtered_revenue["TimeEntryBilledAmount"].sum()
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Revenue", f"${total_revenue:,.0f}")
-    col2.metric("Total Team Hours", f"{filtered_team_hours['BillableHoursAmount'].sum():,.0f} hours")
-    col3.metric("Total Matters", f"{filtered_matters.shape[0]:,.0f} matters")
+    col2.metric("Current Month Hours", f"{current_month_hours:,.0f} hours")
+    col3.metric("Prior Month Hours", f"{prior_month_hours:,.0f} hours")
 
     st.markdown("---")
 
@@ -288,7 +303,7 @@ if page == "Dashboard":
         st.plotly_chart(fig1, use_container_width=True)
 
 
-    # 🎯 PLOT 2: prior_team_hours (Bar Chart)
+    # 🎯 PLOT 2: CumulativeRevenue (Bar Chart)
     with col2:
 
         fig_ytd_revenue = px.bar(
@@ -323,66 +338,81 @@ if page == "Dashboard":
 
     # ----------------------------------------------------------------------------
     # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart)
+
     st.subheader("Weekly Individual Hours", divider="gray")
 
     # ✅ Convert BillableHoursDate to Weekly Period & Aggregate
-    filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
+    filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(
+        filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D"
+    )
 
     # ✅ Aggregate by Week and Staff
-    weekly_individual_hours = filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
+    weekly_individual_hours = (
+        filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
+    )
+    # ✅ Filter: Only the 6 most recent weeks before or equal to selected end_date
+    valid_weeks = weekly_individual_hours["Week"].unique()
+    recent_weeks = sorted([w for w in valid_weeks if w <= end_date])[-6:]
+    weekly_individual_hours = weekly_individual_hours[weekly_individual_hours["Week"].isin(recent_weeks)]
 
     # ✅ Compute Weekly Average Daily Hours (Total Weekly Hours / 5)
     weekly_individual_hours["AvgDailyHours"] = weekly_individual_hours["BillableHoursAmount"] / 5
-
-    # ✅ Create text column formatted as string (e.g. "7.4 h/d")
     weekly_individual_hours["AvgDailyText"] = weekly_individual_hours["AvgDailyHours"].apply(lambda x: f"{x:.1f} h/d")
+    weekly_individual_hours["AvgWorked"] = weekly_individual_hours["AvgDailyHours"] * 5
+    weekly_individual_hours["WeeklyGoal"] = treshold_hours_staff_weekly
 
+    # ✅ Create composite label per bar: Week + Staff
+    weekly_individual_hours["GroupLabel"] = weekly_individual_hours["Week"].dt.strftime("%Y-%m-%d") + " - " + weekly_individual_hours["Staff"]
 
-    # ✅ Create Grouped Bar Chart with Enhanced Tooltip
-    fig_individual_hours_bar = px.bar(
-        weekly_individual_hours,
-        x="Week",
-        y="BillableHoursAmount",
-        color="Staff",
-        title="Weekly Individual Hours Worked",
-        labels={"BillableHoursAmount": "Total Hours Worked", "Week": "Week Start", "Staff": "Staff Member"},
-        color_discrete_sequence=custom_palette,
-        barmode="group",
-        text="AvgDailyText" # ✅ Display average daily hours text
-        #hover_data={"AvgDailyHours": ":.2f"}  # ✅ Show Avg Daily Hours in Tooltip (formatted to 2 decimals)
-    )
-    # ✅ Position the labels on top of the bars
-    fig_individual_hours_bar.update_traces(textposition="outside")
-    if show_goals:
-        fig_individual_hours_bar.add_hline(
-                y=treshold_hours_staff_weekly,
-                line_dash="dash",
-                line_color="red",
-        )
+    # ✅ Build the overlayed figure
+    fig = go.Figure()
 
-        fig_individual_hours_bar.add_annotation(
-            x=weekly_individual_hours["Week"].max(),  # latest week (rightmost x-axis value)
-            y=treshold_hours_staff_weekly,
-            text=f"Individual minimum: {treshold_hours_staff_weekly:,.0f}",
-            showarrow=False,
-            font=dict(color="red", size=12),
-            align="left",
-            bgcolor="white",
-            bordercolor="red",
-            borderwidth=1,
-            borderpad=4,
-            xanchor="left",
-            yanchor="bottom"
-        )
-    
-    fig_individual_hours_bar.update_layout(
-        xaxis_title="Week",
+    # Bar 1: Goal (light gray)
+    fig.add_trace(go.Bar(
+        x=weekly_individual_hours["GroupLabel"],
+        y=weekly_individual_hours["WeeklyGoal"],
+        name="Goal (19h)",
+        marker_color="rgba(128,128,128,0.3)",
+        offsetgroup="bars",
+        base=0,
+        hoverinfo="skip"
+    ))
+
+    # Bar 2: Avg (semi-transparent)
+    fig.add_trace(go.Bar(
+        x=weekly_individual_hours["GroupLabel"],
+        y=weekly_individual_hours["AvgWorked"],
+        name="Avg Daily × 5",
+        marker_color="rgba(100,149,237,0.4)",
+        offsetgroup="bars",
+        base=0
+    ))
+
+    # Bar 3: Actual (solid)
+    fig.add_trace(go.Bar(
+        x=weekly_individual_hours["GroupLabel"],
+        y=weekly_individual_hours["BillableHoursAmount"],
+        name="Total Worked",
+        text=weekly_individual_hours["AvgDailyText"],
+        textposition="outside",
+        marker_color="rgba(52,152,219,1)",
+        offsetgroup="bars",
+        base=0
+    ))
+
+    # ✅ Final layout
+    fig.update_layout(
+        title="Weekly Individual Hours (Goal vs Avg vs Actual)",
+        xaxis_title="Staff per Week",
         yaxis_title="Total Hours Worked",
-        xaxis=dict(tickformat="%Y-%m-%d"),  # ✅ Format weeks properly
+        barmode="overlay",  # 🔥 This stacks the layers
+        bargap=0.4,
+        xaxis_tickangle=-45
     )
 
-    # ✅ Display the Chart in Streamlit
-    st.plotly_chart(fig_individual_hours_bar, use_container_width=True)
+    # ✅ Show in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
+
     # ----------------------------------------------------------------------------
 
 
@@ -399,27 +429,6 @@ if page == "Dashboard":
         color_discrete_sequence=[DARK_BLUE]
         )
 
-        if show_goals:
-            team_weekly_goal = treshold_hours_staff_weekly * len(custom_staff_list)
-            fig_weekly_hours.add_hline(
-                y=team_weekly_goal,
-                line_dash="dash",
-                line_color="red"
-            )
-            fig_weekly_hours.add_annotation(
-                x=total_team_hours_weekly["Week"].max(),
-                y=team_weekly_goal,
-                text=f"Team Weekly Goal: {team_weekly_goal:,.0f} hrs",
-                showarrow=False,
-                font=dict(color="red", size=12),
-                align="left",
-                bgcolor="white",
-                bordercolor="red",
-                borderwidth=1,
-                borderpad=4,
-                xanchor="left",
-                yanchor="bottom"
-            )
         fig_weekly_hours.update_layout(
             xaxis_title="Week",
             yaxis_title="Hours Worked",
@@ -440,26 +449,7 @@ if page == "Dashboard":
             labels={"Month": "Month", "BillableHoursAmount": "Hours Worked"},
             color_discrete_sequence=[DARK_BLUE]
         )
-        if show_goals:
-            fig_prior_team_hours.add_hline(
-                y=treshold_hours,
-                line_dash="dash",
-                line_color="red",
-            )
-            fig_prior_team_hours.add_annotation(
-                x=prior_months_team_hours["Month"].max(),
-                y=treshold_hours,
-                text=f"Team Monthly Goal: {treshold_hours:,.0f} hrs",
-                showarrow=False,
-                font=dict(color="red", size=12),
-                align="left",
-                bgcolor="white",
-                bordercolor="red",
-                borderwidth=1,
-                borderpad=4,
-                xanchor="left",
-                yanchor="bottom"
-            )
+
 
         fig_prior_team_hours.update_layout(
             xaxis_title="Month",
@@ -497,28 +487,6 @@ if page == "Dashboard":
         color_discrete_sequence=custom_palette
     )
 
-    # ✅ Optional: Add threshold line and annotation
-    if show_goals:
-        fig_individual_hours_bar.add_hline(
-            y=treshold_hours_staff_monthly,
-            line_dash="dash",
-            line_color="red",
-        )
-
-        fig_individual_hours_bar.add_annotation(
-            x=monthly_individual_hours["Staff"].iloc[-1],  # last staff in x-axis
-            y=treshold_hours_staff_monthly,
-            text=f"Individual minimum: {treshold_hours_staff_monthly:,.0f}",
-            showarrow=False,
-            font=dict(color="red", size=12),
-            align="right",
-            bgcolor="white",
-            bordercolor="red",
-            borderwidth=1,
-            borderpad=4,
-            xanchor="left",
-            yanchor="bottom"
-        )
 
     # ✅ Final layout
     fig_individual_hours_bar.update_layout(
@@ -608,6 +576,82 @@ if page == "Dashboard":
         )
 
         st.plotly_chart(fig_weekly_new_matters, use_container_width=True)
+
+    # ✅ Matrix for Prebills
+    # Define 12 months based on today
+    # ✅ Custom CSS to align selectboxes and labels
+    st.markdown("""
+    <style>
+        .stSelectbox {
+            padding-top: 0.4rem !important;
+            padding-bottom: 0.4rem !important;
+        }
+        .element-container:has(.stSelectbox) {
+            display: flex;
+            align-items: center;
+        }
+        .row-label {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            font-weight: 500;
+            padding-left: 0.5rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    months = pd.date_range(start=pd.Timestamp.today().replace(month=1, day=1), periods=12, freq="MS").strftime("%b").tolist()
+    # ✅ Load existing data or initialize
+    prebills_data = {}
+    if PREBILLS_FILE.exists():
+        try:
+            with open(PREBILLS_FILE, "r") as f:
+                content = f.read().strip()
+                if content:
+                    prebills_data = json.loads(content)
+        except json.JSONDecodeError:
+            st.warning("⚠️ The prebills file is corrupted or empty. Initializing fresh data.")
+
+    # ✅ Ensure all staff and months exist in the data
+    for staff in custom_staff_list:
+        if staff not in prebills_data:
+            prebills_data[staff] = {}
+        for month in months:
+            if month not in prebills_data[staff]:
+                prebills_data[staff][month] = "No"
+
+    # ✅ Build editable matrix
+    st.title("Prebills Back On Time")
+    st.write("Update Yes/No per staff and month:")
+
+    with st.form("prebills_form"):
+        updated_data = {}
+
+        # Header
+        cols = st.columns(len(months) + 1)
+        cols[0].markdown("**Name**")
+        for i, month in enumerate(months):
+            cols[i + 1].markdown(f"**{month}**")
+
+        # Rows
+        for staff in custom_staff_list:
+            row = st.columns(len(months) + 1)
+            row[0].markdown(f"<div class='row-label'>{staff}</div>", unsafe_allow_html=True)
+            updated_data[staff] = {}
+            for i, month in enumerate(months):
+                key = f"{staff}_{month}"
+                updated_data[staff][month] = row[i + 1].selectbox(
+                    "",
+                    options=["Yes", "No"],
+                    index=["Yes", "No"].index(prebills_data[staff][month]),
+                    key=key
+                )
+
+        # Save button
+        if st.form_submit_button("Save"):
+            with open(PREBILLS_FILE, "w") as f:
+                json.dump(updated_data, f, indent=4)
+            st.success("✅ Matrix saved successfully!")
+
     # ----------------------------------------------------------------------------
 elif page == "Settings":
     st.title("🔧 Dashboard Settings")
