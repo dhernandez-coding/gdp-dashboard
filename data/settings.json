@@ -1,4 +1,5 @@
 {
     "treshold_hours": 910,
-    "treshold_revenue": 2000000
+    "treshold_revenue": 2000000,
+    "custom_staff_list": ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "TGF", "KWD"]
 }
