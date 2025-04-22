@@ -173,7 +173,7 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
         payout_by_month = (
             combined_summary.groupby(["Month", "Type"], as_index=False)["Total Payout"].sum()
         )
-
+ 
         # ✅ Sort months chronologically (important to avoid random bar order)
         payout_by_month["Month_dt"] = pd.to_datetime(payout_by_month["Month"])
         payout_by_month = payout_by_month.sort_values("Month_dt")
