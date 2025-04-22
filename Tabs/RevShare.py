@@ -46,10 +46,10 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
 
     st.markdown("---")
 
-    # 🧠 Step 1: Staff dropdown
-    staff_selected = st.selectbox("Select Staff Member", staff_list)
+    #  Step 1: Staff dropdown
+    staff_selected = st.selectbox("Select Staff", staff_list)
 
-    # 🧠 Step 2: Filter and rename RevShare table
+    # Step 2: Filter and rename RevShare table
     filtered_rev = (
         revshare[
             (revshare["RevShareDate"] >= pd.to_datetime(start_date)) &
@@ -62,21 +62,53 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
             "RevShareMonth": "Month",
             "RevShareYear": "Year",
             "RevShareDate": "Date",
-            "Staff": "Staff Member",
-            "TotalRevShareMonth": "Total Revenue Month",
+            "Staff": "Staff",
+            "FMONHours": "FMON Hours",
+            "FMONRevenue": "FMON Revenue",
+            "FONEHours": "FONE Hours",
+            "FONERevenue": "FONE Revenue",
+            "HourlyHours": "Hourly Hours",
+            "HourlyRevenue": "Hourly Revenue",
+            "TotalRevShareMonth": "Total Production Revenue",
             "RevTier1": "Tier 1",
             "RevTier2": "Tier 2",
             "RevTier3": "Tier 3",
             "RevTierTotal": "Total Tiers",
-            "OriginationFees": "Origination",
+            "OriginationFees": "Origination Revenue Share",
             "RevShareTotal": "Total Revenue Share"
         })
     )
-    display_rev = format_as_money(filtered_rev.copy(), ["Total Revenue Month", "Total Revenue Share", "Origination", "Total Tiers","Tier 1", "Tier 2", "Tier 3"])
-    st.subheader(f"Revenue Share Summary:")
-    st.dataframe(display_rev, use_container_width=True, height=250)
+    # Step 3: Add Production Revenue Share
+    filtered_rev["Production Revenue Share"] = (filtered_rev["Tier 1"] + filtered_rev["Tier 2"] +  filtered_rev["Tier 3"])
+    # Step 4: Reorder columns explicitly
+    desired_order = [
+        "Year",
+        "Month",
+        "Date",
+        "Staff",
+        "FMON Hours",
+        "FMON Revenue",
+        "FONE Hours",
+        "FONE Revenue",
+        "Hourly Hours",
+        "Hourly Revenue",
+        "Total Production Revenue",
+        "Tier 1",
+        "Tier 2",
+        "Tier 3",
+        "Total Tiers",
+        "Production Revenue Share",
+        "Origination Revenue Share",
+        "Total Revenue Share"
+    ]
 
-    # 🧠 Step 3: Define reusable settings
+    # Ensure all desired columns are in filtered_rev before reordering
+    filtered_rev = filtered_rev[[col for col in desired_order if col in filtered_rev.columns]]
+    display_rev = format_as_money(filtered_rev.copy(), ["FONE Revenue","FMON Revenue","Hourly Revenue","Total Production Revenue", "Total Revenue Share", "Origination Revenue Share", "Total Tiers","Tier 1", "Tier 2", "Tier 3", "Production Revenue Share"])
+    st.subheader(f"Revenue Share Summary:")
+    st.dataframe(display_rev, use_container_width=True, height=250) # Here is the visual for the table
+
+    #  Step 5: Define reusable settings for FONE, FMON and Hourly
     col_renames = {
         "TimeEntryName": "Time Entry Name",
         "TimeEntryDate": "Date",
@@ -92,7 +124,7 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
     }
     selected_cols = list(col_renames.values())
 
-    # 🧠 Step 4: Loop over each Time Entry type
+    # Step 4: Loop over each Time Entry type
     # Mapping from internal labels to user-friendly names
     label_map = {
         "Type I": "FONE",
@@ -149,12 +181,12 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
 
         # 🎯 Fill the KPI placeholders now
         total_revenue_share = filtered_rev["Total Revenue Share"].sum()
-        total_revenue = filtered_rev["Total Revenue Month"].sum()
+        total_revenue = filtered_rev["Total Production Revenue"].sum()
         Amount = combined_summary["Amount"].sum()
 
-        kpi_revenue.metric("Total Revenue", f"${total_revenue:,.0f}")
+        kpi_revenue.metric("Total Production Revenue", f"${total_revenue:,.0f}")
         kpi_hours.metric("Total Hours", f"{Amount:,.0f} hours")
-        kpi_share.metric("Total Revenue Share", f"${total_revenue_share:,.0f}")
+        kpi_share.metric("Total Share", f"${total_revenue_share:,.0f}")
 
         # Plot
         st.subheader(f"Payout Summary for {staff_selected}")
