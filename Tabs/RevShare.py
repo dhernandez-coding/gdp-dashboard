@@ -31,12 +31,13 @@ def load_data():
     return revshare, TETypeI, TETypeII, TETypeIII
 
 revshare, TETypeI,TETypeII,TETypeIII =load_data()
-custom_staff_list = st.session_state["custom_staff_list"]
 
 
 
-def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=revshare, TETypeI=TETypeI, TETypeII=TETypeII, TETypeIII=TETypeIII):
+
+def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETypeII=TETypeII, TETypeIII=TETypeIII):
     st.title("Revenue Share Review")
+    custom_staff_list = st.session_state["custom_staff_list"]
     # Set up top KPIs with placeholders
     col1, col2, col3 = st.columns(3)
     kpi_revenue = col1.empty()
@@ -47,7 +48,8 @@ def run_revshare(start_date, end_date, staff_list=custom_staff_list, revshare=re
     st.markdown("---")
 
     #  Step 1: Staff dropdown
-    staff_selected = st.selectbox("Select Staff", staff_list)
+    staff_selected = st.selectbox("Select Staff", custom_staff_list)
+
 
     # Step 2: Filter and rename RevShare table
     filtered_rev = (

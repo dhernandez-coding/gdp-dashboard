@@ -14,13 +14,7 @@ PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
 today = pd.Timestamp.today()
 default_start_date = today - pd.DateOffset(years=1)
 default_end_date = today - pd.DateOffset(days=2)
-treshold_hours = st.session_state["treshold_hours"]
-treshold_revenue = st.session_state["treshold_revenue"]
 
-custom_staff_list = st.session_state["custom_staff_list"]
-treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
-treshold_hours_staff_monthly = treshold_hours / 12
-treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
 # ✅ Define Colors
 PRIMARY_COLOR = "#399db7"  # Light blue
 DARK_BLUE = "#052b48"      # Dark blue
@@ -52,7 +46,15 @@ def load_data():
 # Load data
 revenue, billable_hours, matters = load_data()
 
-def run_rlg_dashboard(start_date,end_date,show_goals,treshold_revenue=treshold_revenue,treshold_revenue_staff=treshold_revenue_staff,treshold_hours_staff_weekly=treshold_hours_staff_weekly,revenue=revenue, billable_hours=billable_hours, matters=matters):
+def run_rlg_dashboard(start_date, end_date, show_goals):
+
+    treshold_hours = st.session_state["treshold_hours"]
+    treshold_revenue = st.session_state["treshold_revenue"]
+
+    custom_staff_list = st.session_state["custom_staff_list"]
+    treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
+    treshold_hours_staff_monthly = treshold_hours / 12
+    treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
 
     # Apply date filter to all datasets
     filtered_revenue = revenue[(revenue["TimeEntryDate"] >= start_date) & (revenue["TimeEntryDate"] <= end_date)]

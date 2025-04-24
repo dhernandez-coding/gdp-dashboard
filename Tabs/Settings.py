@@ -21,12 +21,6 @@ def save_threshold_settings(thresholds: dict):
     with open(SETTINGS_FILE, "w") as f:
         json.dump(thresholds, f, indent=4)
 
-# ✅ Initial load if session state doesn't have it yet
-if "treshold_hours" not in st.session_state or "treshold_revenue" not in st.session_state or "custom_staff_list" not in st.session_state:
-    saved_settings = load_threshold_settings()
-    st.session_state["treshold_hours"] = saved_settings["treshold_hours"]
-    st.session_state["treshold_revenue"] = saved_settings["treshold_revenue"]
-    st.session_state["custom_staff_list"] = saved_settings["custom_staff_list"]
 
 def run_settings():
     st.title("🔧 Dashboard Settings")
@@ -63,14 +57,18 @@ def run_settings():
             "custom_staff_list": updated_staff_list
         }
 
-        # Update session state
+        # Save to settings.json
+        save_threshold_settings(updated_settings)
+
+        # 🧠 Optional: directly update session_state (no need to reload from file)
         st.session_state["treshold_hours"] = new_hours
         st.session_state["treshold_revenue"] = new_revenue
         st.session_state["custom_staff_list"] = updated_staff_list
 
-        save_threshold_settings(updated_settings)
+        # Show success and rerun
         st.success("✅ Settings saved successfully!")
-        st.rerun()
+
+
 
     # Live preview
     if updated_staff_list:

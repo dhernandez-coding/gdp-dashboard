@@ -10,6 +10,27 @@ import numpy as np
 import json
 
 
+
+# ----------------------------------------------------------------------------
+# ✅ Initialize Session State for Threshold Settings
+SETTINGS_FILE = Path(__file__).parent / "data" / "settings.json"
+
+def load_threshold_settings():
+    if SETTINGS_FILE.exists():
+        with open(SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "treshold_hours": 910,
+        "treshold_revenue": 2000000,
+        "custom_staff_list": ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "TGF", "KWD"]
+    }
+
+# ✅ Initial load if session state doesn't have it yet
+if "treshold_hours" not in st.session_state or "treshold_revenue" not in st.session_state or "custom_staff_list" not in st.session_state:
+    saved_settings = load_threshold_settings()
+    st.session_state["treshold_hours"] = saved_settings["treshold_hours"]
+    st.session_state["treshold_revenue"] = saved_settings["treshold_revenue"]
+    st.session_state["custom_staff_list"] = saved_settings["custom_staff_list"]
 # ✅ Define logo path
 logo_path = Path(__file__).parent / "data" / "resolution.png"
 
