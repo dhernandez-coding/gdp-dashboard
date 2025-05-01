@@ -13,7 +13,7 @@ PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
 
 today = pd.Timestamp.today()
 default_start_date = today - pd.DateOffset(years=1)
-default_end_date = today - pd.DateOffset(days=2)
+default_end_date = pd.to_datetime(today).to_period("M").end_time ##- pd.DateOffset(days=2)
 
 # ✅ Define Colors
 PRIMARY_COLOR = "#399db7"  # Light blue
@@ -27,16 +27,17 @@ def load_data():
     data_path = Path(__file__).parents[1] / "data"
 
     # Load CSVs
-    revenue = pd.read_csv(data_path / "vTimeEntries.csv", parse_dates=["TimeEntryDate"])
+    revenue = pd.read_csv(data_path / "RevShareNewLogic.csv", parse_dates=["RevShareDate"])
     billable_hours = pd.read_csv(data_path / "vBillableHoursStaff.csv", parse_dates=["BillableHoursDate"])
     matters = pd.read_csv(data_path / "vMatters.csv", parse_dates=["MatterCreationDate"])
+    
 
     # ✅ Apply Date Transformations Once (for efficiency)
     billable_hours["Month"] = billable_hours["BillableHoursDate"].dt.to_period("M").astype(str)
     billable_hours["Week"] = billable_hours["BillableHoursDate"] - pd.to_timedelta(billable_hours["BillableHoursDate"].dt.dayofweek, unit="D")
 
-    revenue["Month"] = revenue["TimeEntryDate"].dt.to_period("M").astype(str)
-    revenue["Week"] = revenue["TimeEntryDate"] - pd.to_timedelta(revenue["TimeEntryDate"].dt.dayofweek, unit="D")
+    revenue["MonthDate"] = revenue["RevShareDate"].dt.to_period("M").dt.to_timestamp()
+    revenue["WeekDate"] = revenue["RevShareDate"] - pd.to_timedelta(revenue["RevShareDate"].dt.dayofweek, unit="D")
 
     matters["Week"] = matters["MatterCreationDate"] - pd.to_timedelta(matters["MatterCreationDate"].dt.dayofweek, unit="D")
 
@@ -57,7 +58,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
 
     # Apply date filter to all datasets
-    filtered_revenue = revenue[(revenue["TimeEntryDate"] >= start_date) & (revenue["TimeEntryDate"] <= end_date)]
+    filtered_revenue = revenue[(revenue["RevShareDate"] >= start_date) & (revenue["RevShareDate"] <= end_date)]
     filtered_team_hours = billable_hours[(billable_hours["BillableHoursDate"] >= start_date) & (billable_hours["BillableHoursDate"] <= end_date)]
     filtered_matters = matters[(matters["MatterCreationDate"] >= start_date) & (matters["MatterCreationDate"] <= end_date)]
     # ✅ Filter matters created within the selected year-to-date range
@@ -78,27 +79,29 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ----------------------------------------------------------------------------
     ## Transformating data 
     # ✅ Convert Dates for Monthly Aggregation
-    filtered_revenue["Month"] = filtered_revenue["TimeEntryDate"].dt.to_period("M").astype(str)
+    filtered_revenue["MonthDate"] = filtered_revenue["RevShareDate"].dt.to_period("M").dt.to_timestamp()
+
+
     filtered_team_hours["Month"] = filtered_team_hours["BillableHoursDate"].dt.to_period("M").astype(str)
     
     # ✅ Convert Dates for Weekly Aggregation
-    filtered_revenue["Week"] = filtered_revenue["TimeEntryDate"] - pd.to_timedelta(filtered_revenue["TimeEntryDate"].dt.dayofweek, unit="D")
+    filtered_revenue["WeekDate"] = filtered_revenue["RevShareDate"] - pd.to_timedelta(filtered_revenue["RevShareDate"].dt.dayofweek, unit="D")
     filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
-    
+    filtered_revenue["Total"]=filtered_revenue["TotalRevShareMonth"] + filtered_revenue["OriginationFees"]
     # ✅ Identify the Last Selected Month from Date Slider
-    last_selected_month = max(filtered_revenue["Month"])  # Last selected month
-    
+    last_selected_month = max(filtered_revenue["MonthDate"])  # Last selected month
+
     # ✅ 1️⃣ Revenue Per Staff (Monthly)
     revenue_per_staff_monthly = (
-        filtered_revenue.groupby(["Month", "Staff"], as_index=False)["TimeEntryBilledAmount"].sum()
+        filtered_revenue.groupby(["MonthDate", "Staff"], as_index=False)["Total"].sum()
     )
-    # ✅ Multiply by 0.8 to account for 20% commission
-    revenue_per_staff_monthly.loc[:, "TimeEntryBilledAmount"] *= 1 #0.8
+    # # ✅ Multiply by 0.8 to account for 20% commission
+    # revenue_per_staff_monthly.loc[:, "TimeEntryBilledAmount"] *= 1 #0.8
     
     # ✅ 2️⃣ Total Team Revenue (Monthly)
-    total_team_revenue_monthly = revenue_per_staff_monthly.groupby("Month", as_index=False)["TimeEntryBilledAmount"].sum()
+    total_team_revenue_monthly = revenue_per_staff_monthly.groupby("MonthDate", as_index=False)["Total"].sum()
     # Multiply for the 0.8 to account for 20% commission
-    total_team_revenue_monthly.loc[:, "TimeEntryBilledAmount"] *= 1 #
+    total_team_revenue_monthly.loc[:, "Total"] *= 1 #
     
     # ✅ 3️⃣ Billable Hours Per Staff (Weekly)
     billable_hours_per_staff_weekly = filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
@@ -113,10 +116,10 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     total_team_hours_monthly = billable_hours_per_staff_monthly.groupby("Month", as_index=False)["BillableHoursAmount"].sum()
     
     # ✅ Sort by Month to ensure proper cumulative sum
-    total_team_revenue_monthly = total_team_revenue_monthly.sort_values(by="Month")
+    total_team_revenue_monthly = total_team_revenue_monthly.sort_values(by="MonthDate")
     
     # ✅ Compute the cumulative sum
-    total_team_revenue_monthly["CumulativeRevenue"] = total_team_revenue_monthly["TimeEntryBilledAmount"].cumsum()
+    total_team_revenue_monthly["CumulativeRevenue"] = total_team_revenue_monthly["Total"].cumsum()
     
     # ✅ Convert MatterCreationDate to Weekly Period
     filtered_matters_ytd["Week"] = filtered_matters_ytd["MatterCreationDate"] - pd.to_timedelta(filtered_matters_ytd["MatterCreationDate"].dt.dayofweek, unit="D")
@@ -133,43 +136,46 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ Step 2: Generate all 12 months in the selected year (Jan → Dec)
     all_months = pd.date_range(start=pd.Timestamp(selected_year, 1, 1), 
                                end=pd.Timestamp(selected_year, 12, 31), 
-                               freq="MS").strftime("%Y-%m").tolist()
+                               freq="MS")
     
     # ✅ Step 3: Create a DataFrame with all 12 months
-    all_months_df = pd.DataFrame({"Month": all_months, "Year": selected_year})
+    all_months_df = pd.DataFrame({"MonthDate": all_months, "Year": selected_year})
     
+    ytd_revenue = total_team_revenue_monthly[
+    total_team_revenue_monthly["MonthDate"].dt.year == selected_year
+]
     # ✅ Step 4: Filter `total_team_revenue_monthly` for the selected year only
     ytd_revenue = total_team_revenue_monthly[
-        total_team_revenue_monthly["Month"].str.startswith(str(selected_year))
+        total_team_revenue_monthly["MonthDate"].dt.year == selected_year
+
     ]
     
     # ✅ Step 5: Merge with the full 12-month dataset to ensure no months are missing
-    ytd_revenue = all_months_df.merge(ytd_revenue, on=["Month"], how="left")
+    ytd_revenue = all_months_df.merge(ytd_revenue, on=["MonthDate"], how="left")
     
     # ✅ Step 6: Fill missing revenue values with 0
-    ytd_revenue["TimeEntryBilledAmount"] = ytd_revenue["TimeEntryBilledAmount"].fillna(0)
+    ytd_revenue["Total"] = ytd_revenue["Total"].fillna(0)
     
     # ✅ Step 7: Compute cumulative revenue (YTD)
-    ytd_revenue["CumulativeRevenue"] = ytd_revenue["TimeEntryBilledAmount"].cumsum()
+    ytd_revenue["CumulativeRevenue"] = ytd_revenue["Total"].cumsum()
     
     # ✅ Step 8: Identify the last month where revenue is greater than 0
-    last_revenue_month = ytd_revenue[ytd_revenue["TimeEntryBilledAmount"] > 0]["Month"].max()
+    last_revenue_month = ytd_revenue[ytd_revenue["Total"] > 0]["MonthDate"].max()
     
     # ✅ Step 9: Set cumulative revenue to 0 for months after the last revenue month
-    ytd_revenue.loc[ytd_revenue["Month"] > last_revenue_month, "CumulativeRevenue"] = 0
+    ytd_revenue.loc[ytd_revenue["MonthDate"] > last_revenue_month, "CumulativeRevenue"] = 0
     
     # ✅ Step 10: Ensure sorting by Month
-    ytd_revenue["Month"] = pd.to_datetime(ytd_revenue["Month"])  # Convert to datetime for proper sorting
-    ytd_revenue = ytd_revenue.sort_values("Month")
+    ytd_revenue["MonthDate"] = pd.to_datetime(ytd_revenue["MonthDate"])  # Convert to datetime for proper sorting
+    ytd_revenue = ytd_revenue.sort_values("MonthDate")
     
     # ✅ Step 11: Format month labels for better display
-    ytd_revenue["MonthLabel"] = ytd_revenue["Month"].dt.strftime("%b %Y")  # Example: "Jan 2025"
+    ytd_revenue["MonthLabel"] = ytd_revenue["MonthDate"].dt.strftime("%b %Y")  # Example: "Jan 2025"
     
     # ✅ Step 12: Create a goal line based on the goal set up on the settings for the year
     ytd_revenue["GoalRevenue"] = np.linspace(0, treshold_revenue, num=12) 
     
     #----Month Filtering --------------------------------------------------
-    print(total_team_hours_monthly.columns)
     current_month_hours = total_team_hours_monthly.loc[
         total_team_hours_monthly["Month"] == current_month, "BillableHoursAmount"
     ].sum()
@@ -180,7 +186,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ---------------------------------------------------------------------------- 
         
     # ✅ KPI METRICS (Dynamically Updating)
-    total_revenue = filtered_revenue["TimeEntryBilledAmount"].sum()
+    total_revenue = filtered_revenue["Total"].sum()
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Revenue", f"${total_revenue:,.0f}")
     col2.metric("Current Month Hours", f"{current_month_hours:,.0f} hours")
@@ -193,7 +199,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     st.subheader("Weekly Team Hours & YTD Revenue", divider="gray")
     col1, col2 = st.columns(2)
     # Filter only prior months
-    prior_months_team_hours = total_team_hours_monthly[total_team_hours_monthly["Month"] < last_selected_month]
+    total_team_hours_monthly["MonthDate"] = pd.to_datetime(total_team_hours_monthly["Month"])
+    prior_months_team_hours = total_team_hours_monthly[total_team_hours_monthly["MonthDate"] < last_selected_month]
     # ✅ Convert BillableHoursDate to Weekly Period & Aggregate
     # 🎯 PLOT 1: Cumulative Revenue (Bar Chart)
     with col1:
@@ -202,10 +209,10 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         fig1 = px.bar(
             filtered_revenue,
             x="Staff",
-            y="TimeEntryBilledAmount",
+            y="Total",
             color="Staff",
             title=f"{selected_year} Individual YTD Revenue",
-            labels={"TimeEntryBilledAmount": "Revenue ($)"},
+            labels={"Total": "Revenue ($)"},
             color_discrete_sequence=[PRIMARY_COLOR],
             hover_data=[]
         )
@@ -266,7 +273,6 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             )
         )
         st.plotly_chart(fig_ytd_revenue, use_container_width=True)
-
 
 
     # ----------------------------------------------------------------------------
