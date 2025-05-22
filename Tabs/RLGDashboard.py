@@ -20,7 +20,18 @@ PRIMARY_COLOR = "#399db7"  # Light blue
 DARK_BLUE = "#052b48"      # Dark blue
 COMPLEMENTARY_COLOR1 = "#FF6F61"  # Coral (for differentiation)
 COMPLEMENTARY_COLOR2 = "#F4A261"  # Warm orange (for better contrast)
-custom_palette = ["#052B48", "#4CA7ED", "#3371A1", "#E3C26D", "#E3B36D"]
+custom_palette = [
+    "#052B48",  # deep navy
+    "#3371A1",  # steel blue
+    "#4CA7ED",  # sky blue
+    "#76C7E0",  # soft sky (lighter)
+    "#0288A7",  # teal‑blue (darker/livelier)
+
+    "#E3C26D",  # mustard
+    "#E3B36D",  # warm tan
+    "#DAA520",  # goldenrod (richer gold)
+    "#F0E68C",  # khaki yellow (softer)
+]
 
 def load_data():
     """Load datasets from the /data folder and preprocess dates."""
@@ -303,52 +314,74 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ Create composite label per bar: Week + Staff
     weekly_individual_hours["GroupLabel"] = weekly_individual_hours["Week"].dt.strftime("%Y-%m-%d") + " - " + weekly_individual_hours["Staff"]
 
-    # ✅ Build the overlayed figure
+   # Define a color palette and map each staff to a distinct color
+    staff_list = weekly_individual_hours["Staff"].unique()
+    palette = custom_palette  # you can choose any Plotly qualitative palette
+    color_map = {staff: palette[i % len(palette)] for i, staff in enumerate(staff_list)}
+    
+    # Apply the mapping to create a list of colors corresponding to each row
+    weekly_individual_hours["StaffColor"] = weekly_individual_hours["Staff"].map(color_map)
+    
+    # Build the overlaid figure
     fig = go.Figure()
-
+    
     # Bar 1: Goal (light gray)
     fig.add_trace(go.Bar(
         x=weekly_individual_hours["GroupLabel"],
         y=weekly_individual_hours["WeeklyGoal"],
         name="Goal (19h)",
+        showlegend=False,
         marker_color="rgba(128,128,128,0.3)",
         offsetgroup="bars",
-        base=0,
         hoverinfo="skip"
     ))
-
+    
     # Bar 2: Avg (semi-transparent)
     fig.add_trace(go.Bar(
         x=weekly_individual_hours["GroupLabel"],
         y=weekly_individual_hours["AvgWorked"],
+        showlegend=False,
         name="Avg Daily × 5",
         marker_color="rgba(100,149,237,0.4)",
-        offsetgroup="bars",
-        base=0
+        offsetgroup="bars"
     ))
-        # Bar 3: Actual (solid)
-    fig.add_trace(go.Bar(
-        x=weekly_individual_hours["GroupLabel"],
-        y=weekly_individual_hours["BillableHoursAmount"],
-        name="Total Worked",
-        text=weekly_individual_hours["AvgDailyText"],
-        textposition="outside",
-        marker_color="rgba(52,152,219,1)",
-        offsetgroup="bars",
-        base=0
-    ))
-
-    # ✅ Final layout
+    
+    # Bar 3: Actual (distinct color per staff)
+    for staff in staff_list:
+        df = weekly_individual_hours[weekly_individual_hours["Staff"] == staff]
+        fig.add_trace(go.Bar(
+            x=df["GroupLabel"],
+            y=df["BillableHoursAmount"],
+            name=staff,                                  # staff name shows up in legend
+            marker_color=color_map[staff],
+            text=df["AvgDailyText"],
+            textposition="outside"
+        ))
+    
     fig.update_layout(
         title="Weekly Individual Hours (Goal vs Avg vs Actual)",
         xaxis_title="Staff per Week",
         yaxis_title="Total Hours Worked",
-        barmode="overlay",  # 🔥 This stacks the layers
+        barmode="overlay",
         bargap=0.4,
-        xaxis_tickangle=-45
+        xaxis_tickangle=-45,
+    
+        # ← place legend horizontally below the plot
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-.45,        # move it below the x-axis
+            xanchor="center",
+            x=0.5
+        ),
+        margin=dict(
+        b=0,       # increase from b=100 up to whatever you need
+        t=0,        # top margin (optional)
+        l=0,        # left margin (optional)
+        r=0         # right margin (optional)
+        )  # give extra bottom margin for the legend
     )
-
-    # ✅ Show in Streamlit
+    
     st.plotly_chart(fig, use_container_width=True)
 
     # ----------------------------------------------------------------------------
@@ -379,22 +412,42 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     
         # 🎯 Step 9: PLOT Team Hours
 
+        months = pd.period_range(
+            start=start_date.to_period("M"),
+            end=end_date.to_period("M"),
+            freq="M"
+        ).astype(str).tolist()    # e.g. ['2025-01','2025-02',...,'2025-05']
+        
+        # 2) Filter & aggregate as before
+        prior_months_team_hours = total_team_hours_monthly[
+            total_team_hours_monthly["Month"].isin(months)
+        ].copy()
+        
+        # 3) Turn Month into an ordered Categorical
+        prior_months_team_hours["Month"] = pd.Categorical(
+            prior_months_team_hours["Month"],
+            categories=months,
+            ordered=True
+        )
+        
+        # 4) Now plot, and Plotly will automatically include every category
         fig_prior_team_hours = px.bar(
-            prior_months_team_hours,  # ✅ Filtered dataset
+            prior_months_team_hours,
             x="Month",
             y="BillableHoursAmount",
             title="Team Hours - Prior Months",
-            labels={"Month": "Month", "BillableHoursAmount": "Hours Worked"},
-            color_discrete_sequence=[DARK_BLUE]
+            labels={"Month":"Month", "BillableHoursAmount":"Hours Worked"},
+            color_discrete_sequence=[DARK_BLUE],
+            category_orders={"Month": months}   # also enforce in the legend/order
         )
-
-
+        
+        # 5) Final layout: no need for explicit tickvals now
         fig_prior_team_hours.update_layout(
             xaxis_title="Month",
             yaxis_title="Hours Worked",
-            xaxis=dict(tickmode="array", tickvals=prior_months_team_hours["Month"])
+            bargap=0.2
         )
-
+        
         st.plotly_chart(fig_prior_team_hours, use_container_width=True)
 
     # ✅ MONTHLY INDIVIDUAL HOURS (Grouped Bar Chart)
