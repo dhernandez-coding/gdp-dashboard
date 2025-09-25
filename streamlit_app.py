@@ -22,15 +22,26 @@ def load_threshold_settings():
     return {
         "treshold_hours": 910,
         "treshold_revenue": 2000000,
-        "custom_staff_list": ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "TGF", "KWD"]
+        "custom_staff_list": ["AEZ", "BPL", "CAJ", "JER", "JRJ", "RAW", "TGF", "KWD", "JMG"],
+        "staff_weekly_goals": {   # 👈 add default weekly goals here
+            "AEZ": 20, "BPL": 20, "CAJ": 20,
+            "JER": 20, "JRJ": 20, "RAW": 20,
+            "TGF": 20, "KWD": 20, "JMG": 20,
+        },
     }
 
-# ✅ Initial load if session state doesn't have it yet
-if "treshold_hours" not in st.session_state or "treshold_revenue" not in st.session_state or "custom_staff_list" not in st.session_state:
+
+if (
+    "treshold_hours" not in st.session_state
+    or "treshold_revenue" not in st.session_state
+    or "custom_staff_list" not in st.session_state
+    or "staff_weekly_goals" not in st.session_state
+):
     saved_settings = load_threshold_settings()
-    st.session_state["treshold_hours"] = saved_settings["treshold_hours"]
-    st.session_state["treshold_revenue"] = saved_settings["treshold_revenue"]
-    st.session_state["custom_staff_list"] = saved_settings["custom_staff_list"]
+    st.session_state["treshold_hours"] = saved_settings.get("treshold_hours", 910)
+    st.session_state["treshold_revenue"] = saved_settings.get("treshold_revenue", 2000000)
+    st.session_state["custom_staff_list"] = saved_settings.get("custom_staff_list", list(Settings.DEFAULT_STAFF_WEEKLY_GOALS.keys()))
+    st.session_state["staff_weekly_goals"] = saved_settings.get("staff_weekly_goals", Settings.DEFAULT_STAFF_WEEKLY_GOALS.copy())
 # ✅ Define logo path
 logo_path = Path(__file__).parent / "data" / "resolution.png"
 

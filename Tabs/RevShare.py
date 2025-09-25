@@ -120,8 +120,8 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
         "TimeEntryRate": "Rate",
         "TimeEntryGross": "Gross",
         "TimeEntryBilledAmount": "Billed Amount",
-        "TotalPaymentPayable": "Payable",
-        "TimeEntryBreakDown": "Breakdown",
+        # "TotalPaymentPayable": "Payable",
+        # "TimeEntryBreakDown": "Breakdown",
         "TotalPayout": "Total Payout"
     }
     selected_cols = list(col_renames.values())
@@ -152,7 +152,7 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
 
         # Keep only relevant columns
         filtered_te = filtered_te[selected_cols]
-        display_te = format_as_money(filtered_te.copy(), ["Rate", "Gross", "Billed Amount", "Payable","Total Payout"])
+        display_te = format_as_money(filtered_te.copy(), ["Rate", "Gross", "Billed Amount", "Total Payout"])
         # Display
         friendly_label = label_map[label]
         st.subheader(f"{friendly_label} Time Entries")

@@ -9,6 +9,18 @@
         "JRJ",
         "RAW",
         "TGF",
-        "KWD"
-    ]
+        "KWD",
+        "JMG"
+    ],
+    "staff_weekly_goals": {
+        "AEZ": 10,
+        "BPL": 20,
+        "CAJ": 20,
+        "JER": 20,
+        "JRJ": 20,
+        "RAW": 20,
+        "TGF": 20,
+        "KWD": 20,
+        "JMG": 20
+    }
 }

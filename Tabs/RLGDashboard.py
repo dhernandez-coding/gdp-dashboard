@@ -6,7 +6,7 @@ from pathlib import Path
 import datetime
 import numpy as np
 import json
-
+from Tabs import Settings
 
 # ✅ Set default date range (One year ago to today)
 PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
@@ -136,8 +136,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     filtered_matters_ytd["Week"] = filtered_matters_ytd["MatterCreationDate"] - pd.to_timedelta(filtered_matters_ytd["MatterCreationDate"].dt.dayofweek, unit="D")
     
     # ✅ Get current and prior month based on the latest selected month
-    current_month = str(pd.to_datetime(last_selected_month).to_period("M"))
-    prior_month = str((pd.to_datetime(last_selected_month) - pd.DateOffset(months=1)).to_period("M"))
+    current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
+    prior_month = (pd.Timestamp.today() - pd.DateOffset(months=1)).to_period("M").strftime("%Y-%m")
     
     
     #------------------------------------------YTD CALCULATIONS-------------------------------------------- 
@@ -286,104 +286,112 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         st.plotly_chart(fig_ytd_revenue, use_container_width=True)
 
 
-    # ----------------------------------------------------------------------------
-    # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart)
-
+   # ----------------------------------------------------------------------------
+    # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart) — with guaranteed gray goal bars
     st.subheader("Weekly Individual Hours", divider="gray")
-
-    # ✅ Convert BillableHoursDate to Weekly Period & Aggregate
-    filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(
-        filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D"
+    cutoff_date = pd.to_datetime("2025-09-01")
+    
+    # 1) Normalize Staff codes safely (fixes AttributeError)
+    filtered_team_hours["Staff"] = (
+        filtered_team_hours["Staff"].astype(str).str.strip().str.upper()
     )
-
-    # ✅ Aggregate by Week and Staff
+    
+    # 2) Compute Monday-of-week for each row
+    filtered_team_hours["Week"] = (
+        filtered_team_hours["BillableHoursDate"]
+        - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
+    )
+    
+    # 3) Aggregate actual hours
     weekly_individual_hours = (
         filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
     )
-    # ✅ Filter: Only the 6 most recent weeks before or equal to selected end_date
-    valid_weeks = weekly_individual_hours["Week"].unique()
-    recent_weeks = sorted([w for w in valid_weeks if w <= end_date])[-6:]
-    weekly_individual_hours = weekly_individual_hours[weekly_individual_hours["Week"].isin(recent_weeks)]
-
-    # ✅ Compute Weekly Average Daily Hours (Total Weekly Hours / 5)
+    
+    # 4) Build calendar last-6-week grid up to end_date (so gray bars always have x)
+    end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
+    recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]  # oldest → newest
+    
+    # Apply cutoff if desired
+    recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
+    if not recent_weeks:  # fallback to end_week if all weeks were cut off
+        recent_weeks = [end_week]
+    
+    # 5) Cross product: (recent weeks × all staff in settings)
+    custom_staff_list = st.session_state["custom_staff_list"]
+    frame = pd.MultiIndex.from_product([recent_weeks, custom_staff_list], names=["Week", "Staff"]).to_frame(index=False)
+    
+    # 6) Left-join actual data onto the full frame; fill missing hours with 0
+    weekly_individual_hours = frame.merge(
+        weekly_individual_hours, on=["Week", "Staff"], how="left"
+    ).fillna({"BillableHoursAmount": 0})
+    
+    # 7) Map weekly goals per staff (0 if not defined)
+    goals = st.session_state.get("staff_weekly_goals", {})
+    weekly_individual_hours["WeeklyGoal"] = weekly_individual_hours["Staff"].map(lambda s: goals.get(s, 0))
+    
+    # 8) Derived columns for labels
     weekly_individual_hours["AvgDailyHours"] = weekly_individual_hours["BillableHoursAmount"] / 5
     weekly_individual_hours["AvgDailyText"] = weekly_individual_hours["AvgDailyHours"].apply(lambda x: f"{x:.1f} h/d")
-    weekly_individual_hours["AvgWorked"] = weekly_individual_hours["AvgDailyHours"] * 5
-    weekly_individual_hours["WeeklyGoal"] = treshold_hours_staff_weekly
-
-    # ✅ Create composite label per bar: Week + Staff
-    weekly_individual_hours["GroupLabel"] = weekly_individual_hours["Week"].dt.strftime("%Y-%m-%d") + " - " + weekly_individual_hours["Staff"]
-
-   # Define a color palette and map each staff to a distinct color
-    staff_list = weekly_individual_hours["Staff"].unique()
-    palette = custom_palette  # you can choose any Plotly qualitative palette
+    weekly_individual_hours["GroupLabel"] = (
+        weekly_individual_hours["Week"].dt.strftime("%Y-%m-%d") + " - " + weekly_individual_hours["Staff"]
+    )
+    
+    # 9) Colors per staff
+    staff_list = custom_staff_list  # keep order consistent with Settings
+    palette = custom_palette
     color_map = {staff: palette[i % len(palette)] for i, staff in enumerate(staff_list)}
     
-    # Apply the mapping to create a list of colors corresponding to each row
-    weekly_individual_hours["StaffColor"] = weekly_individual_hours["Staff"].map(color_map)
-    
-    # Build the overlaid figure
+    # 10) Plot
     fig = go.Figure()
     
-    # Bar 1: Goal (light gray)
+    # Bar 1: Weekly goal (light gray) — always present for all x positions
     fig.add_trace(go.Bar(
         x=weekly_individual_hours["GroupLabel"],
         y=weekly_individual_hours["WeeklyGoal"],
-        name="Goal (19h)",
+        name="Weekly Goal",
         showlegend=False,
         marker_color="rgba(128,128,128,0.3)",
         offsetgroup="bars",
         hoverinfo="skip"
     ))
     
-    # Bar 2: Avg (semi-transparent)
-    fig.add_trace(go.Bar(
-        x=weekly_individual_hours["GroupLabel"],
-        y=weekly_individual_hours["AvgWorked"],
-        showlegend=False,
-        name="Avg Daily × 5",
-        marker_color="rgba(100,149,237,0.4)",
-        offsetgroup="bars"
-    ))
-    
-    # Bar 3: Actual (distinct color per staff)
+    # Bar 2: Actual hours by staff (stacked visually over the gray bar via overlay)
     for staff in staff_list:
         df = weekly_individual_hours[weekly_individual_hours["Staff"] == staff]
         fig.add_trace(go.Bar(
             x=df["GroupLabel"],
             y=df["BillableHoursAmount"],
-            name=staff,                                  # staff name shows up in legend
+            name=staff,
             marker_color=color_map[staff],
             text=df["AvgDailyText"],
             textposition="outside"
         ))
     
+    # Optional: transparent bar to print staff initials inside bars
+    fig.add_trace(go.Bar(
+        x=weekly_individual_hours["GroupLabel"],
+        y=weekly_individual_hours["BillableHoursAmount"],
+        showlegend=False,
+        marker_color="rgba(0, 0, 0, 0)",
+        text=weekly_individual_hours["Staff"],
+        textposition="inside",
+        textangle=0,
+        insidetextanchor="middle",
+        textfont=dict(color="white", size=11),
+        offsetgroup="bars"
+    ))
+    
     fig.update_layout(
-        title="Weekly Individual Hours (Goal vs Avg vs Actual)",
-        xaxis_title="Staff per Week",
+        xaxis_title="Weeks",
         yaxis_title="Total Hours Worked",
         barmode="overlay",
         bargap=0.4,
         xaxis_tickangle=-45,
-    
-        # ← place legend horizontally below the plot
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-.45,        # move it below the x-axis
-            xanchor="center",
-            x=0.5
-        ),
-        margin=dict(
-        b=0,       # increase from b=100 up to whatever you need
-        t=0,        # top margin (optional)
-        l=0,        # left margin (optional)
-        r=0         # right margin (optional)
-        )  # give extra bottom margin for the legend
+        legend=dict(orientation="h", yanchor="top", y=-.45, xanchor="center", x=0.5),
+        margin=dict(b=0, t=0, l=0, r=0)
     )
     
     st.plotly_chart(fig, use_container_width=True)
-
     # ----------------------------------------------------------------------------
 
 
@@ -469,10 +477,9 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         y="BillableHoursAmount",
         color="MonthLabel",
         barmode="group",
-        title="Monthly Individual Hours Worked",
         labels={
             "BillableHoursAmount": "Total Hours Worked",
-            "Staff": "Staff Member",
+            "Staff": "Staff",
             "MonthLabel": "Month"
         },
         color_discrete_sequence=custom_palette
@@ -481,7 +488,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     # ✅ Final layout
     fig_individual_hours_bar.update_layout(
-        xaxis_title="Staff Member",
+        xaxis_title="Staff",
         yaxis_title="Total Hours Worked",
         legend_title="Month",
         bargap=0.15
@@ -519,13 +526,13 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             x="Staff",
             y="size",
             title="YTD New Matters",
-            labels={"size": "New Matters", "Staff": "Staff Member"},
+            labels={"size": "New Matters", "Staff": "Staff"},
             color="Staff",
             color_discrete_sequence=custom_palette
         )
 
         fig_ytd_matters.update_layout(
-            xaxis_title="Staff Member",
+            xaxis_title="Staff",
             yaxis_title="New Matters",
         )
 
@@ -547,7 +554,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
         # ✅ Count new matters per staff per week
         weekly_new_matters_per_staff = weekly_staff_matter_data.groupby(["Week", "Staff"], as_index=False).size()
-
+        latest_weeks = sorted(weekly_new_matters_per_staff["Week"].unique())[-2:]
+        weekly_new_matters_per_staff = weekly_new_matters_per_staff[weekly_new_matters_per_staff["Week"].isin(latest_weeks)]
         # ✅ Create Bar Chart
         fig_weekly_new_matters = px.bar(
             weekly_new_matters_per_staff,
@@ -555,7 +563,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             y="size",
             color="Staff",
             title="Weekly New Matters",
-            labels={"size": "New Matters", "Week": "Week Start", "Staff": "Staff Member"},
+            labels={"size": "New Matters", "Week": "Week Start", "Staff": "Staff"},
             color_discrete_sequence=custom_palette,
             barmode="group"
         )
@@ -563,7 +571,9 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         fig_weekly_new_matters.update_layout(
             xaxis_title="Week",
             yaxis_title="New Matters",
-            xaxis=dict(tickformat="%Y-%m-%d"),  # ✅ Format weeks properly
+            xaxis=dict(tickformat="%Y-%m-%d"),
+            bargap=0.05,         # ← reduces space between group sets
+            bargroupgap=0.05     # ← reduces space between bars within a group
         )
 
         st.plotly_chart(fig_weekly_new_matters, use_container_width=True)
@@ -611,7 +621,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 prebills_data[staff][month] = "No"
 
     # ✅ Build editable matrix
-    st.title("Prebills Back On Time")
+    st.subheader("Prebills Back On Time", divider="gray")
     st.write("Update Yes/No per staff and month:")
 
     with st.form("prebills_form"):
