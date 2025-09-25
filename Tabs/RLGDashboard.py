@@ -290,60 +290,60 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart) — with guaranteed gray goal bars
     st.subheader("Weekly Individual Hours", divider="gray")
     cutoff_date = pd.to_datetime("2025-09-01")
-    
+
     # 1) Normalize Staff codes safely (fixes AttributeError)
     filtered_team_hours["Staff"] = (
         filtered_team_hours["Staff"].astype(str).str.strip().str.upper()
     )
-    
+
     # 2) Compute Monday-of-week for each row
     filtered_team_hours["Week"] = (
         filtered_team_hours["BillableHoursDate"]
         - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
     )
-    
+
     # 3) Aggregate actual hours
     weekly_individual_hours = (
         filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
     )
-    
+
     # 4) Build calendar last-6-week grid up to end_date (so gray bars always have x)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
     recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]  # oldest → newest
-    
+
     # Apply cutoff if desired
     recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
     if not recent_weeks:  # fallback to end_week if all weeks were cut off
         recent_weeks = [end_week]
-    
+
     # 5) Cross product: (recent weeks × all staff in settings)
     custom_staff_list = st.session_state["custom_staff_list"]
     frame = pd.MultiIndex.from_product([recent_weeks, custom_staff_list], names=["Week", "Staff"]).to_frame(index=False)
-    
+
     # 6) Left-join actual data onto the full frame; fill missing hours with 0
     weekly_individual_hours = frame.merge(
         weekly_individual_hours, on=["Week", "Staff"], how="left"
     ).fillna({"BillableHoursAmount": 0})
-    
+
     # 7) Map weekly goals per staff (0 if not defined)
     goals = st.session_state.get("staff_weekly_goals", {})
     weekly_individual_hours["WeeklyGoal"] = weekly_individual_hours["Staff"].map(lambda s: goals.get(s, 0))
-    
+
     # 8) Derived columns for labels
     weekly_individual_hours["AvgDailyHours"] = weekly_individual_hours["BillableHoursAmount"] / 5
     weekly_individual_hours["AvgDailyText"] = weekly_individual_hours["AvgDailyHours"].apply(lambda x: f"{x:.1f} h/d")
     weekly_individual_hours["GroupLabel"] = (
         weekly_individual_hours["Week"].dt.strftime("%Y-%m-%d") + " - " + weekly_individual_hours["Staff"]
     )
-    
+
     # 9) Colors per staff
     staff_list = custom_staff_list  # keep order consistent with Settings
     palette = custom_palette
     color_map = {staff: palette[i % len(palette)] for i, staff in enumerate(staff_list)}
-    
+
     # 10) Plot
     fig = go.Figure()
-    
+
     # Bar 1: Weekly goal (light gray) — always present for all x positions
     fig.add_trace(go.Bar(
         x=weekly_individual_hours["GroupLabel"],
@@ -351,10 +351,9 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         name="Weekly Goal",
         showlegend=False,
         marker_color="rgba(128,128,128,0.3)",
-        offsetgroup="bars",
         hoverinfo="skip"
     ))
-    
+
     # Bar 2: Actual hours by staff (stacked visually over the gray bar via overlay)
     for staff in staff_list:
         df = weekly_individual_hours[weekly_individual_hours["Staff"] == staff]
@@ -366,7 +365,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             text=df["AvgDailyText"],
             textposition="outside"
         ))
-    
+
     # Optional: transparent bar to print staff initials inside bars
     fig.add_trace(go.Bar(
         x=weekly_individual_hours["GroupLabel"],
@@ -378,9 +377,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         textangle=0,
         insidetextanchor="middle",
         textfont=dict(color="white", size=11),
-        offsetgroup="bars"
     ))
-    
+
     fig.update_layout(
         xaxis_title="Weeks",
         yaxis_title="Total Hours Worked",
@@ -390,7 +388,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         legend=dict(orientation="h", yanchor="top", y=-.45, xanchor="center", x=0.5),
         margin=dict(b=0, t=0, l=0, r=0)
     )
-    
+
     st.plotly_chart(fig, use_container_width=True)
     # ----------------------------------------------------------------------------
 
