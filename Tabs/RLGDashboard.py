@@ -419,7 +419,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 y=team_weekly_goal,
                 line_dash="dash",
                 line_color="red",
-                annotation_text=f"Weekly Goal: {treshold_hours_staff_weekly:,.0f}",
+                annotation_text=f"Weekly Goal: {team_weekly_goal:,.0f}",
                 annotation_position="top left",
             )
 
@@ -468,7 +468,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 y=team_monthly_goal,
                 line_dash="dash",
                 line_color="red",
-                annotation_text=f"Monthly Goal: {treshold_hours_staff_monthly:,.0f}",
+                annotation_text=f"Monthly Goal: {team_monthly_goal:,.0f}",
                 annotation_position="top left",
             )
 
