@@ -7,7 +7,7 @@ import pandas as pd
 
 SETTINGS_FILE = Path(__file__).parents[1] / "data" / "settings.json"
 DATA_PATH = Path(__file__).parents[1] / "data" / "vBillableHoursStaff.csv"
-
+PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
 # Build selectable staff list from data
 df_time_entries = pd.read_csv(DATA_PATH)
 unique_staff_list = sorted(df_time_entries["StaffAbbreviation"].dropna().unique().tolist())
@@ -145,3 +145,92 @@ def run_settings():
         st.dataframe(preview, use_container_width=True)
     else:
         st.warning("⚠️ No staff members defined.")
+
+    ###################### HERE ##################
+    # ✅ Matrix for Prebills
+    # Define 12 months based on today
+    # ✅ Custom CSS to align selectboxes and labels
+    st.markdown("""
+    <style>
+        .stSelectbox, .stRadio {
+            padding-top: 0.4rem !important;
+            padding-bottom: 0.4rem !important;
+        }
+        .element-container:has(.stSelectbox), .element-container:has(.stRadio) {
+            display: flex;
+            align-items: center;
+        }
+        .row-label {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            font-weight: 500;
+            padding-left: 0.5rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    months = pd.date_range(
+        start=pd.Timestamp.today().replace(month=1, day=1),
+        periods=12,
+        freq="MS"
+    ).strftime("%b").tolist()
+
+    # ✅ Load existing data or initialize
+    prebills_data = {}
+    if PREBILLS_FILE.exists():
+        try:
+            with open(PREBILLS_FILE, "r") as f:
+                content = f.read().strip()
+                if content:
+                    prebills_data = json.loads(content)
+        except json.JSONDecodeError:
+            st.warning("⚠️ The prebills file is corrupted or empty. Initializing fresh data.")
+
+    # ✅ Ensure all staff and months exist in the data
+    for staff in current_staff_list:
+        if staff not in prebills_data:
+            prebills_data[staff] = {}
+        for month in months:
+            # Default each month to "Yes" if not previously defined
+            if month not in prebills_data[staff]:
+                prebills_data[staff][month] = "Yes"
+
+    # ✅ Build editable matrix
+    st.subheader("Prebills Back On Time", divider="gray")
+    st.write("Update Yes/No per staff and month:")
+
+    with st.form("prebills_form"):
+        updated_data = {}
+
+        # Header row
+        cols = st.columns(len(months) + 1)
+        cols[0].markdown("**Name**")
+        for i, month in enumerate(months):
+            cols[i + 1].markdown(f"**{month}**")
+
+        # Rows for each staff
+        for staff in current_staff_list:
+            row = st.columns(len(months) + 1)
+            row[0].markdown(f"<div class='row-label'>{staff}</div>", unsafe_allow_html=True)
+            updated_data[staff] = {}
+
+            for i, month in enumerate(months):
+                key = f"{staff}_{month}"
+                default_value = prebills_data[staff].get(month, "Yes")
+
+                # ✅ Radio button instead of selectbox
+                updated_data[staff][month] = row[i + 1].radio(
+                    "Prebills Response",
+                    options=["Yes", "No"],
+                    index=["Yes", "No"].index(default_value),
+                    key=key,
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+
+        # Save button
+        if st.form_submit_button("Save"):
+            with open(PREBILLS_FILE, "w") as f:
+                json.dump(updated_data, f, indent=4)
+            st.success("✅ Matrix saved successfully!")

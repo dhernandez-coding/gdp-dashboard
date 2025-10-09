@@ -67,6 +67,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
     treshold_hours_staff_monthly = treshold_hours / 12
     treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
+    # Fixed monthly goal from annual target (optional overlay)
 
     # Apply date filter to all datasets
     filtered_revenue = revenue[(revenue["RevShareDate"] >= start_date) & (revenue["RevShareDate"] <= end_date)]
@@ -184,7 +185,12 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     ytd_revenue["MonthLabel"] = ytd_revenue["MonthDate"].dt.strftime("%b %Y")  # Example: "Jan 2025"
     
     # ✅ Step 12: Create a goal line based on the goal set up on the settings for the year
-    ytd_revenue["GoalRevenue"] = np.linspace(0, treshold_revenue, num=12) 
+    # ytd_revenue["GoalRevenue"] = np.linspace(0, treshold_revenue, num=12) 
+    ytd_revenue["MonthNumber"] = ytd_revenue["MonthDate"].dt.month
+
+    # Example: if current month = October (10/12 = 0.83 or 83%)
+    months_in_year = 12
+    ytd_revenue["GoalRevenue"] = (ytd_revenue["MonthNumber"] / months_in_year) * treshold_revenue
     
     #----Month Filtering --------------------------------------------------
     current_month_hours = total_team_hours_monthly.loc[
@@ -238,7 +244,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             fig1.add_annotation(
                 x=filtered_revenue["Staff"].max(),  # rightmost staff member on x-axis
                 y=treshold_revenue_staff,
-                text=f"Threshold: ${treshold_revenue_staff:,.0f}",
+                text=f"Goal: ${treshold_revenue_staff:,.0f}",
                 showarrow=False,
                 font=dict(color="red", size=12),
                 align="left",
@@ -391,20 +397,31 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     st.plotly_chart(fig, use_container_width=True)
     # ----------------------------------------------------------------------------
-
+    team_monthly_goal = treshold_hours_staff_monthly * len(custom_staff_list)
+    team_weekly_goal = treshold_hours_staff_weekly * len(custom_staff_list)
 
     col11, col22 = st.columns(2)
 
     with col11:
         # Weekly Team Hours Chart
         fig_weekly_hours = px.bar(
-        total_team_hours_weekly,  # ✅ Use the correct dataset
-        x="Week",
-        y="BillableHoursAmount",
-        title="Weekly Team Hours",
-        labels={"Week": "Week Start", "BillableHoursAmount": "Hours Worked"},
-        color_discrete_sequence=[DARK_BLUE]
+            total_team_hours_weekly,  # ✅ Use the correct dataset
+            x="Week",
+            y="BillableHoursAmount",
+            title="Weekly Team Hours",
+            labels={"Week": "Week Start", "BillableHoursAmount": "Hours Worked"},
+            color_discrete_sequence=[DARK_BLUE]
         )
+
+        # ✅ Add Weekly Goal Line
+        if show_goals:
+            fig_weekly_hours.add_hline(
+                y=team_weekly_goal,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"Weekly Goal: {treshold_hours_staff_weekly:,.0f}",
+                annotation_position="top left",
+            )
 
         fig_weekly_hours.update_layout(
             xaxis_title="Week",
@@ -415,84 +432,53 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         st.plotly_chart(fig_weekly_hours, use_container_width=True)
 
     with col22:
-    
         # 🎯 Step 9: PLOT Team Hours
-
         months = pd.period_range(
             start=start_date.to_period("M"),
             end=end_date.to_period("M"),
             freq="M"
-        ).astype(str).tolist()    # e.g. ['2025-01','2025-02',...,'2025-05']
-        
+        ).astype(str).tolist()  # e.g. ['2025-01','2025-02',...]
+
         # 2) Filter & aggregate as before
         prior_months_team_hours = total_team_hours_monthly[
             total_team_hours_monthly["Month"].isin(months)
         ].copy()
-        
+
         # 3) Turn Month into an ordered Categorical
         prior_months_team_hours["Month"] = pd.Categorical(
             prior_months_team_hours["Month"],
             categories=months,
             ordered=True
         )
-        
+
         # 4) Now plot, and Plotly will automatically include every category
         fig_prior_team_hours = px.bar(
             prior_months_team_hours,
             x="Month",
             y="BillableHoursAmount",
-            title="Team Hours - Prior Months",
-            labels={"Month":"Month", "BillableHoursAmount":"Hours Worked"},
+            title="Monthly Team Hours",
+            labels={"Month": "Month", "BillableHoursAmount": "Hours Worked"},
             color_discrete_sequence=[DARK_BLUE],
-            category_orders={"Month": months}   # also enforce in the legend/order
+            category_orders={"Month": months}
         )
-        
-        # 5) Final layout: no need for explicit tickvals now
+
+        # ✅ Add Monthly Goal Line
+        if show_goals:
+            fig_prior_team_hours.add_hline(
+                y=team_monthly_goal,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"Monthly Goal: {treshold_hours_staff_monthly:,.0f}",
+                annotation_position="top left",
+            )
+
         fig_prior_team_hours.update_layout(
             xaxis_title="Month",
             yaxis_title="Hours Worked",
             bargap=0.2
         )
-        
+
         st.plotly_chart(fig_prior_team_hours, use_container_width=True)
-
-    # ✅ MONTHLY INDIVIDUAL HOURS (Grouped Bar Chart)
-    st.subheader("Monthly Individual Hours", divider="gray")
-
-    # ✅ Ensure the Month column is datetime for sorting
-    filtered_team_hours["Month"] = filtered_team_hours["BillableHoursDate"].dt.to_period("M").astype(str)
-    monthly_individual_hours = filtered_team_hours.groupby(["Month", "Staff"], as_index=False)["BillableHoursAmount"].sum()
-
-    # ✅ Sort Month and create readable label
-    monthly_individual_hours["MonthDate"] = pd.to_datetime(monthly_individual_hours["Month"])
-    monthly_individual_hours = monthly_individual_hours.sort_values(by=["Staff", "MonthDate"])
-    monthly_individual_hours["MonthLabel"] = monthly_individual_hours["MonthDate"].dt.strftime("%b")  # Jan, Feb...
-
-    # ✅ Create grouped bar chart: x = Staff, color = Month, grouped by staff
-    fig_individual_hours_bar = px.bar(
-        monthly_individual_hours,
-        x="Staff",
-        y="BillableHoursAmount",
-        color="MonthLabel",
-        barmode="group",
-        labels={
-            "BillableHoursAmount": "Total Hours Worked",
-            "Staff": "Staff",
-            "MonthLabel": "Month"
-        },
-        color_discrete_sequence=custom_palette
-    )
-
-
-    # ✅ Final layout
-    fig_individual_hours_bar.update_layout(
-        xaxis_title="Staff",
-        yaxis_title="Total Hours Worked",
-        legend_title="Month",
-        bargap=0.15
-    )
-
-    st.plotly_chart(fig_individual_hours_bar, use_container_width=True)
     #-----------------------------------------------------------------------------------
     
     col111, col222 = st.columns(2)
@@ -581,74 +567,91 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ Custom CSS to align selectboxes and labels
     st.markdown("""
     <style>
-        .stSelectbox {
-            padding-top: 0.4rem !important;
-            padding-bottom: 0.4rem !important;
-        }
-        .element-container:has(.stSelectbox) {
+        .matrix-container {
             display: flex;
+            flex-direction: column;
             align-items: center;
+            width: 100%;
+            overflow-x: auto;
         }
-        .row-label {
-            display: flex;
-            align-items: center;
-            height: 100%;
-            font-weight: 500;
-            padding-left: 0.5rem;
+        .matrix-table {
+            border-collapse: collapse;
+            width: 95%;
+            margin-top: 0.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .matrix-table th {
+            background-color: #f0f2f6;
+            padding: 0.5rem;
+            border-bottom: 1px solid #dcdcdc;
+            font-weight: 600;
+        }
+        .matrix-table td {
+            padding: 0.4rem;
+            border-bottom: 1px solid #eee;
+        }
+        .matrix-yes {
+            background-color: #2ca02c;
+            color: white;
+            border-radius: 4px;
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin: auto;
+        }
+        .matrix-no {
+            background-color: #d62728;
+            color: white;
+            border-radius: 4px;
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin: auto;
+        }
+        .staff-name {
+            text-align: left;
+            font-weight: 600;
+            padding-left: 0.6rem;
         }
     </style>
     """, unsafe_allow_html=True)
-    months = pd.date_range(start=pd.Timestamp.today().replace(month=1, day=1), periods=12, freq="MS").strftime("%b").tolist()
-    # ✅ Load existing data or initialize
+    # ✅ Define months
+    months = pd.date_range(
+        start=pd.Timestamp.today().replace(month=1, day=1),
+        periods=12,
+        freq="MS"
+    ).strftime("%b").tolist()
+    
+    # ✅ Load JSON data
     prebills_data = {}
     if PREBILLS_FILE.exists():
         try:
             with open(PREBILLS_FILE, "r") as f:
-                content = f.read().strip()
-                if content:
-                    prebills_data = json.loads(content)
+                prebills_data = json.load(f)
         except json.JSONDecodeError:
-            st.warning("⚠️ The prebills file is corrupted or empty. Initializing fresh data.")
-
-    # ✅ Ensure all staff and months exist in the data
-    for staff in custom_staff_list:
-        if staff not in prebills_data:
-            prebills_data[staff] = {}
-        for month in months:
-            if month not in prebills_data[staff]:
-                prebills_data[staff][month] = "No"
-
-    # ✅ Build editable matrix
+            st.error("⚠️ The prebills file is corrupted or empty.")
+    else:
+        st.warning("⚠️ No prebills file found.")
+        prebills_data = {}
+    
+    # ✅ Render
     st.subheader("Prebills Back On Time", divider="gray")
-    st.write("Update Yes/No per staff and month:")
-
-    with st.form("prebills_form"):
-        updated_data = {}
-
-        # Header
-        cols = st.columns(len(months) + 1)
-        cols[0].markdown("**Name**")
-        for i, month in enumerate(months):
-            cols[i + 1].markdown(f"**{month}**")
-
-        # Rows
-        for staff in custom_staff_list:
-            row = st.columns(len(months) + 1)
-            row[0].markdown(f"<div class='row-label'>{staff}</div>", unsafe_allow_html=True)
-            updated_data[staff] = {}
-            for i, month in enumerate(months):
-                key = f"{staff}_{month}"
-                updated_data[staff][month] = row[i + 1].selectbox(
-                    "Prebills Response", 
-                    options=["Yes", "No"],
-                    index=["Yes", "No"].index(prebills_data[staff][month]),
-                    key=key,
-                    label_visibility="collapsed"
-                )
-
-        # Save button
-        if st.form_submit_button("Save"):
-            with open(PREBILLS_FILE, "w") as f:
-                json.dump(updated_data, f, indent=4)
-            st.success("✅ Matrix saved successfully!")
+    st.write("Visual summary of prebills status per staff and month:")
+    
+    # ✅ Build full-width HTML table
+    html = "<div class='matrix-container'><table class='matrix-table'>"
+    html += "<tr><th>Name</th>" + "".join([f"<th>{m}</th>" for m in months]) + "</tr>"
+    
+    for staff, months_data in prebills_data.items():
+        html += f"<tr><td class='staff-name'>{staff}</td>"
+        for month in months:
+            value = months_data.get(month, "No")
+            color_class = "matrix-yes" if value == "Yes" else "matrix-no"
+            html += f"<td><div class='{color_class}'></div></td>"
+        html += "</tr>"
+    
+    html += "</table></div>"
+    
+    st.markdown(html, unsafe_allow_html=True)
 
