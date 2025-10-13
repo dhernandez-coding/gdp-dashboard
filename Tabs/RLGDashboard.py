@@ -295,7 +295,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
    # ----------------------------------------------------------------------------
     # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart) — with guaranteed gray goal bars
     st.subheader("Weekly Individual Hours", divider="gray")
-    cutoff_date = pd.to_datetime("2025-09-01")
+    cutoff_date = pd.to_datetime("2025-10-13")
 
     # 1) Normalize Staff codes safely (fixes AttributeError)
     filtered_team_hours["Staff"] = (
