@@ -1,0 +1,48 @@
+{
+    "Jeffrey@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Kevin@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Crystal@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Trey@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Jim@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Jason@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard", "RevShare"]
+    },
+    "Bruce@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Anne@ResolutionLegal.com": {
+        "password": "rlg123",
+        "allowed_tabs": ["RLGDashboard"]
+    },
+    "Russell@ResolutionLegal.com": {
+        "password": "admin",
+        "allowed_tabs": ["RLGDashboard", "Settings", "RevShare"]
+    },
+    "Donna@ResolutionLegal.com": {
+        "password": "admin",
+        "allowed_tabs": ["RLGDashboard", "Settings", "RevShare"]
+    }
+    ,
+    "admin": {
+        "password": "admin",
+        "allowed_tabs": ["RLGDashboard", "Settings", "RevShare"]
+    }
+    
+}
