@@ -90,17 +90,23 @@ def run_settings():
 
     # Weekly goals per staff
     st.markdown("### Weekly Goals per Staff")
-    updated_goals = {}
+
+    updated_goals = st.session_state.get("staff_weekly_goals", {}).copy()
+
     if updated_staff_list:
-        # Create a compact grid of inputs
         cols = st.columns(3)
         for i, staff in enumerate(updated_staff_list):
+            # Load current goal from either session or defaults
+            current_goal_value = updated_goals.get(
+                staff,
+                current_goals.get(staff, DEFAULT_STAFF_WEEKLY_GOALS.get(staff, 20))
+            )
             with cols[i % 3]:
                 updated_goals[staff] = st.number_input(
                     f"{staff} weekly goal (hours)",
                     min_value=0,
                     max_value=60,
-                    value=int(current_goals.get(staff, DEFAULT_STAFF_WEEKLY_GOALS.get(staff, 20))),
+                    value=int(current_goal_value),
                     step=1,
                     key=f"goal_{staff}"
                 )
@@ -109,8 +115,9 @@ def run_settings():
 
     # Save settings
     if st.button("💾 Save Settings"):
-        # Keep goals only for selected staff; drop others to keep it clean
-        goals_to_save = updated_goals if updated_staff_list else current_goals
+        # Keep goals only for selected staff
+        goals_to_save = {s: updated_goals.get(s, DEFAULT_STAFF_WEEKLY_GOALS.get(s, 20))
+                         for s in updated_staff_list} if updated_staff_list else current_goals
 
         updated_settings = {
             "treshold_hours": int(new_hours),
@@ -121,7 +128,7 @@ def run_settings():
 
         save_threshold_settings(updated_settings)
 
-        # Update session state
+        # Update Streamlit session state so it's instantly reflected
         st.session_state["treshold_hours"] = int(new_hours)
         st.session_state["treshold_revenue"] = int(new_revenue)
         st.session_state["custom_staff_list"] = updated_settings["custom_staff_list"]
