@@ -65,8 +65,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     custom_staff_list = st.session_state["custom_staff_list"]
     treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
-    treshold_hours_staff_monthly = treshold_hours / 12
-    treshold_hours_staff_weekly = treshold_hours_staff_monthly / 4
+    treshold_hours_staff_monthly = treshold_hours * 4
+    treshold_hours_staff_weekly = treshold_hours
     # Fixed monthly goal from annual target (optional overlay)
 
     # Apply date filter to all datasets
@@ -295,7 +295,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
    # ----------------------------------------------------------------------------
     # ✅ WEEKLY INDIVIDUAL HOURS (Grouped Bar Chart) — with guaranteed gray goal bars
     st.subheader("Weekly Individual Hours", divider="gray")
-    cutoff_date = pd.to_datetime("2025-10-13")
+    cutoff_date = pd.to_datetime("2025-10-20")
 
     # 1) Normalize Staff codes safely (fixes AttributeError)
     filtered_team_hours["Staff"] = (
@@ -397,8 +397,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     st.plotly_chart(fig, use_container_width=True)
     # ----------------------------------------------------------------------------
-    team_monthly_goal = treshold_hours_staff_monthly * len(custom_staff_list)
-    team_weekly_goal = treshold_hours_staff_weekly * len(custom_staff_list)
+    team_monthly_goal = treshold_hours_staff_monthly
+    team_weekly_goal = treshold_hours_staff_weekly
 
     col11, col22 = st.columns(2)
 
