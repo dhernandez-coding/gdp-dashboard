@@ -24,6 +24,28 @@ DEFAULT_STAFF_WEEKLY_GOALS = {
 # -------------------------------------------------------------
 # ⚙️ Load / Save logic
 # -------------------------------------------------------------
+
+def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
+    """Automatically save whenever an input value changes."""
+    goals_to_save = {
+        s: updated_goals.get(s, DEFAULT_STAFF_WEEKLY_GOALS.get(s, 20))
+        for s in updated_staff_list
+    } if updated_staff_list else DEFAULT_STAFF_WEEKLY_GOALS
+
+    total_weekly_goal = sum(goals_to_save.values())
+
+    updated_settings = {
+        "treshold_hours": total_weekly_goal,
+        "treshold_revenue": int(st.session_state.get("new_revenue", new_revenue)),
+        "custom_staff_list": updated_staff_list,
+        "staff_weekly_goals": goals_to_save,
+    }
+
+    save_threshold_settings(updated_settings)
+    st.session_state.update(updated_settings)
+    st.toast("✅ Auto-saved settings", icon="💾")
+
+
 def load_threshold_settings():
     if SETTINGS_FILE.exists():
         with open(SETTINGS_FILE, "r") as f:
@@ -106,9 +128,14 @@ def run_settings():
         "Team Goal: Total Revenue ($)",
         min_value=0,
         value=int(current_revenue),
-        step=10_000
+        step=10_000,
+        key="new_revenue",
+        on_change=lambda: auto_save_settings(
+            st.session_state.get("custom_staff_list", []),
+            st.session_state.get("staff_weekly_goals", {}),
+            st.session_state["new_revenue"]
+        )
     )
-
     # ---------------------------------------------------------
     # Weekly goals per staff
     # ---------------------------------------------------------
@@ -123,14 +150,16 @@ def run_settings():
                 current_goals.get(staff, DEFAULT_STAFF_WEEKLY_GOALS.get(staff, 20))
             )
             with cols[i % 3]:
-                updated_goals[staff] = st.number_input(
+                new_value = st.number_input(
                     f"{staff} weekly goal (hours)",
                     min_value=0,
                     max_value=60,
                     value=int(current_goal_value),
                     step=1,
-                    key=f"goal_{staff}"
+                    key=f"goal_{staff}",
+                    on_change=lambda s=staff: auto_save_settings(updated_staff_list, updated_goals, new_revenue)
                 )
+                updated_goals[staff] = new_value
     else:
         st.info("Select at least one staff to edit weekly goals.")
 
@@ -163,8 +192,6 @@ def run_settings():
     # ---------------------------------------------------------
     if updated_staff_list:
         st.markdown("### Calculated Thresholds Per Person")
-        per_lawyer_rev = (new_revenue / len(updated_staff_list)) if len(updated_staff_list) else 0
-        st.write(f"**Revenue per lawyer**: ${per_lawyer_rev:,.2f}")
 
         preview = pd.DataFrame(
             {"Staff": updated_staff_list,

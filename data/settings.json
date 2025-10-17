@@ -1,6 +1,6 @@
 {
-    "treshold_hours": 175,
-    "treshold_revenue": 2000000,
+    "treshold_hours": 185,
+    "treshold_revenue": 2200000,
     "custom_staff_list": [
         "AEZ",
         "BPL",
@@ -13,7 +13,7 @@
         "JMG"
     ],
     "staff_weekly_goals": {
-        "AEZ": 15,
+        "AEZ": 25,
         "BPL": 20,
         "CAJ": 20,
         "JER": 20,
