@@ -83,37 +83,37 @@ cursor.close()
 conn.close()
 print("\n All Stored Procedures Executed and Exports Completed!")
 
-# -----------------------------------------------------------------------
-# STEP 3: Write setting.json
-# -----------------------------------------------------------------------
-print("\nBuilding settings.json from StaffGoalsSettings...")
-try:
-    # Pull StaffGoalsSettings table from SQL
-    query = "SELECT StaffAbbreviation, WeeklyGoalHours FROM DW.dim.StaffGoalsSettings"
-    df_goals = pd.read_sql_query(query, conn)
+# # -----------------------------------------------------------------------
+# # STEP 3: Write setting.json
+# # -----------------------------------------------------------------------
+# print("\nBuilding settings.json from StaffGoalsSettings...")
+# try:
+#     # Pull StaffGoalsSettings table from SQL
+#     query = "SELECT StaffAbbreviation, WeeklyGoalHours FROM DW.dim.StaffGoalsSettings"
+#     df_goals = pd.read_sql_query(query, conn)
 
-    # Convert staff abbreviations to list
-    custom_staff_list = df_goals["StaffAbbreviation"].tolist()
+#     # Convert staff abbreviations to list
+#     custom_staff_list = df_goals["StaffAbbreviation"].tolist()
 
-    # Convert to dict of { StaffAbbreviation: WeeklyGoalHours }
-    staff_weekly_goals = dict(zip(df_goals["StaffAbbreviation"], df_goals["WeeklyGoalHours"]))
+#     # Convert to dict of { StaffAbbreviation: WeeklyGoalHours }
+#     staff_weekly_goals = dict(zip(df_goals["StaffAbbreviation"], df_goals["WeeklyGoalHours"]))
 
-    # Define static threshold values
-    settings_json = {
-        "treshold_hours": 185,
-        "treshold_revenue": 2200000,
-        "custom_staff_list": custom_staff_list,
-        "staff_weekly_goals": staff_weekly_goals
-    }
+#     # Define static threshold values
+#     settings_json = {
+#         "treshold_hours": 185,
+#         "treshold_revenue": 2200000,
+#         "custom_staff_list": custom_staff_list,
+#         "staff_weekly_goals": staff_weekly_goals
+#     }
 
-    # Define file path
-    settings_path = os.path.join(EXPORT_PATH, "settings.json")
+#     # Define file path
+#     settings_path = os.path.join(EXPORT_PATH, "settings.json")
 
-    # Write JSON file
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(settings_json, f, indent=4)
+#     # Write JSON file
+#     with open(settings_path, "w", encoding="utf-8") as f:
+#         json.dump(settings_json, f, indent=4)
 
-    print(f"settings.json created successfully at: {settings_path}")
+#     print(f"settings.json created successfully at: {settings_path}")
 
-except Exception as e:
-    print(f"Failed to create settings.json: {e}")
+# except Exception as e:
+#     print(f"Failed to create settings.json: {e}")

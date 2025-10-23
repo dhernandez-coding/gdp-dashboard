@@ -37,6 +37,47 @@ DEFAULT_STAFF_WEEKLY_GOALS = load_default_staff_goals()
 # ⚙️ Load / Save logic
 # -------------------------------------------------------------
 
+def save_prebills_to_github(prebills_data: dict):
+    """Push prebills.json to GitHub when updated."""
+    import base64, requests, json
+    from datetime import datetime
+
+    # --- Save locally first
+    PREBILLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(PREBILLS_FILE, "w") as f:
+        json.dump(prebills_data, f, indent=4)
+
+    # --- GitHub settings from secrets ---
+    token = st.secrets["GITHUB_TOKEN"]
+    repo = st.secrets["GITHUB_REPO"]
+    branch = st.secrets.get("GITHUB_BRANCH", "main")
+    path = "data/prebills.json"
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+
+    # --- Get current file SHA ---
+    response = requests.get(url, headers=headers, params={"ref": branch})
+    sha = response.json().get("sha") if response.status_code == 200 else None
+
+    # --- Prepare content ---
+    encoded_content = base64.b64encode(json.dumps(prebills_data, indent=4).encode()).decode()
+    data = {
+        "message": f"Auto-update prebills.json from Streamlit ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})",
+        "content": encoded_content,
+        "branch": branch,
+    }
+    if sha:
+        data["sha"] = sha
+
+    # --- Commit to GitHub ---
+    put_response = requests.put(url, headers=headers, data=json.dumps(data))
+    if put_response.status_code in (200, 201):
+        st.toast("✅ Prebills updated in GitHub", icon="💾")
+    else:
+        st.error(f"❌ Failed to update prebills.json: {put_response.status_code}")
+        st.write(put_response.text)
+
 def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
     """Automatically save whenever an input value changes."""
     goals_to_save = {
@@ -332,6 +373,5 @@ def run_settings():
                 )
 
         if st.form_submit_button("Save"):
-            with open(PREBILLS_FILE, "w") as f:
-                json.dump(updated_data, f, indent=4)
-            st.success("✅ Matrix saved successfully!")
+            save_prebills_to_github(updated_data)
+            st.success("✅ Prebills matrix saved and synced to GitHub!")
