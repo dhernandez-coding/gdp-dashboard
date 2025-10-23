@@ -191,11 +191,19 @@ def save_threshold_settings(thresholds: dict):
     if sha:
         data["sha"] = sha
 
-    # --- Push to GitHub ---
+    # --- Push to GitHub (with conflict retry) ---
     res = requests.put(url, headers=headers, data=json.dumps(data))
 
+    if res.status_code == 409:
+        st.warning("GitHub conflict detected, retrying with latest SHA...")
+        latest = requests.get(url, headers=headers, params={"ref": branch})
+        if latest.status_code == 200:
+            data["sha"] = latest.json().get("sha")
+            res = requests.put(url, headers=headers, data=json.dumps(data))
+
+    # --- Final status ---
     if res.status_code in (200, 201):
-        st.toast("Settings.json updated on GitHub!")
+        st.toast("settings.json updated on GitHub!")
     else:
         st.error(f"Failed to update GitHub file: {res.status_code}")
         st.code(res.text)
