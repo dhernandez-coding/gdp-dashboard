@@ -5,6 +5,7 @@ import pandas as pd
 import base64
 import requests
 from datetime import datetime
+import time
 # ----------------------And---------------------------------------
 # 📁 File paths
 # -------------------------------------------------------------
@@ -31,6 +32,18 @@ def load_default_staff_goals():
             "JRJ": 20, "RAW": 20, "TGF": 20, "KWD": 20, "JMG": 20,
         }
 
+def push_to_github_serialized(push_func, *args, **kwargs):
+    if st.session_state.get("is_committing", False):
+        st.warning("⏳ Another GitHub commit is in progress, please wait...")
+        return
+
+    st.session_state["is_committing"] = True
+    try:
+        push_func(*args, **kwargs)
+    finally:
+        # small buffer to ensure GitHub commit finishes indexing
+        time.sleep(2)
+        st.session_state["is_committing"] = False
 
 DEFAULT_STAFF_WEEKLY_GOALS = load_default_staff_goals()
 # -------------------------------------------------------------
@@ -94,7 +107,7 @@ def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
         "staff_weekly_goals": goals_to_save,
     }
 
-    save_threshold_settings(updated_settings)
+    push_to_github_serialized(save_threshold_settings, updated_settings)
     st.session_state.update(updated_settings)
     st.toast("✅ Auto-saved settings", icon="💾")
 
@@ -381,5 +394,5 @@ def run_settings():
                 )
 
         if st.form_submit_button("Save"):
-            save_prebills_to_github(updated_data)
+            push_to_github_serialized(save_prebills_to_github, updated_data)
             st.success("✅ Prebills matrix saved and synced to GitHub!")
