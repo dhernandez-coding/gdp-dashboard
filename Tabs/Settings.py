@@ -47,34 +47,38 @@ def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
 
 
 def load_threshold_settings():
+    # ✅ If a local file exists, always use it — do NOT overwrite
     if SETTINGS_FILE.exists():
-        with open(SETTINGS_FILE, "r") as f:
-            settings = json.load(f)
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                settings = json.load(f)
+        except json.JSONDecodeError:
+            st.warning("Settings.json is corrupted. Rebuilding from defaults.")
+            settings = {}
 
-        # ✅ Automatically calculate total hours from weekly goals
+        # Recalculate total hours
         staff_weekly_goals = settings.get("staff_weekly_goals", {})
-        if staff_weekly_goals:
-            total_weekly_goal = sum(staff_weekly_goals.values())
-            settings["treshold_hours"] = total_weekly_goal
+        settings["treshold_hours"] = sum(staff_weekly_goals.values()) if staff_weekly_goals else sum(DEFAULT_STAFF_WEEKLY_GOALS.values())
 
-        # ✅ Ensure essential keys exist
+        # Ensure essential keys
         settings.setdefault("treshold_revenue", 2_000_000)
-        settings.setdefault("custom_staff_list", list(staff_weekly_goals.keys()))
-        settings.setdefault("staff_weekly_goals", staff_weekly_goals)
-
-        # ✅ Persist recalculated threshold back to disk
-        with open(SETTINGS_FILE, "w") as f:
-            json.dump(settings, f, indent=4)
+        settings.setdefault("custom_staff_list", list(staff_weekly_goals.keys()) or list(DEFAULT_STAFF_WEEKLY_GOALS.keys()))
+        settings.setdefault("staff_weekly_goals", staff_weekly_goals or DEFAULT_STAFF_WEEKLY_GOALS.copy())
 
         return settings
 
-    # Defaults if file doesn’t exist
-    return {
+    # 🧱 If no file exists (first run), build it from defaults
+    defaults = {
         "treshold_hours": sum(DEFAULT_STAFF_WEEKLY_GOALS.values()),
         "treshold_revenue": 2_000_000,
         "custom_staff_list": list(DEFAULT_STAFF_WEEKLY_GOALS.keys()),
         "staff_weekly_goals": DEFAULT_STAFF_WEEKLY_GOALS.copy(),
     }
+
+    # ✅ Create the file once — from defaults only
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(defaults, f, indent=4)
 
 
 def save_threshold_settings(thresholds: dict):
