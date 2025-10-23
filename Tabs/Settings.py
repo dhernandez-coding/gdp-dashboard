@@ -2,8 +2,10 @@ import streamlit as st
 import json
 from pathlib import Path
 import pandas as pd
-
-# -------------------------------------------------------------
+import base64
+import requests
+import datetime
+# ----------------------And---------------------------------------
 # 📁 File paths
 # -------------------------------------------------------------
 SETTINGS_FILE = Path(__file__).parents[1] / "data" / "settings.json"
@@ -16,11 +18,21 @@ PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
 df_time_entries = pd.read_csv(DATA_PATH)
 unique_staff_list = sorted(df_time_entries["StaffAbbreviation"].dropna().unique().tolist())
 
-DEFAULT_STAFF_WEEKLY_GOALS = {
-    "AEZ": 20, "BPL": 20, "CAJ": 20, "JER": 20,
-    "JRJ": 20, "RAW": 20, "TGF": 20, "KWD": 20, "JMG": 20,
-}
+def load_default_staff_goals():
+    """Load staff goals dynamically from settings.json"""
+    if SETTINGS_FILE.exists():
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        return settings.get("staff_weekly_goals", {})
+    else:
+        st.warning("⚠️ settings.json not found. Using fallback defaults.")
+        return {
+            "AEZ": 20, "BPL": 20, "CAJ": 20, "JER": 20,
+            "JRJ": 20, "RAW": 20, "TGF": 20, "KWD": 20, "JMG": 20,
+        }
 
+
+DEFAULT_STAFF_WEEKLY_GOALS = load_default_staff_goals()
 # -------------------------------------------------------------
 # ⚙️ Load / Save logic
 # -------------------------------------------------------------
@@ -79,17 +91,73 @@ def load_threshold_settings():
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(defaults, f, indent=4)
-
+        
+    return defaults
 
 def save_threshold_settings(thresholds: dict):
-    """Save settings and automatically recalculate treshold_hours."""
+    """
+    Save settings.json locally and push to GitHub only if there are real changes.
+    """
+
+    # --- Recalculate and enrich metadata ---
     staff_goals = thresholds.get("staff_weekly_goals", {})
     thresholds["treshold_hours"] = sum(staff_goals.values()) if staff_goals else thresholds.get("treshold_hours", 910)
+    thresholds["last_updated_at"] = datetime.now().isoformat()
 
+    # --- Always save locally for immediate use ---
+    SETTINGS_FILE = Path(__file__).parents[1] / "data" / "settings.json"
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SETTINGS_FILE, "w") as f:
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(thresholds, f, indent=4)
 
+    # --- GitHub API setup ---
+    token = st.secrets["GITHUB_TOKEN"]
+    repo = st.secrets["GITHUB_REPO"]
+    path = st.secrets["GITHUB_FILE_PATH"]
+    branch = st.secrets.get("GITHUB_BRANCH", "main")
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}"}
+
+    # --- Fetch current file from GitHub ---
+    response = requests.get(url, headers=headers, params={"ref": branch})
+    if response.status_code == 200:
+        sha = response.json().get("sha")
+        current_content = base64.b64decode(response.json()["content"]).decode()
+        try:
+            current_json = json.loads(current_content)
+        except json.JSONDecodeError:
+            current_json = {}
+    else:
+        sha = None
+        current_json = {}
+
+    # --- Compare old vs new content ---
+    if current_json == thresholds:
+        st.toast("No changes detected — skipping GitHub commit")
+        return
+
+    # --- Prepare content for GitHub commit ---
+    new_content = json.dumps(thresholds, indent=4)
+    encoded_content = base64.b64encode(new_content.encode()).decode()
+
+    data = {
+        "message": f"Auto-update settings.json from Streamlit ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})",
+        "content": encoded_content,
+        "branch": branch,
+        "committer": {"name": "Streamlit Bot", "email": "bot@streamlit.app"},
+    }
+    if sha:
+        data["sha"] = sha
+
+    # --- Push to GitHub ---
+    res = requests.put(url, headers=headers, data=json.dumps(data))
+
+    if res.status_code in (200, 201):
+        st.toast("Settings.json updated on GitHub!")
+    else:
+        st.error(f"Failed to update GitHub file: {res.status_code}")
+        st.code(res.text)
 
 def _ensure_session_defaults():
     """Always refresh Streamlit session state with the latest settings."""
