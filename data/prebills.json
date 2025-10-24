@@ -10,7 +10,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "No",
         "Dec": "Yes"
     },
     "BPL": {
@@ -24,7 +24,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "CAJ": {
@@ -38,7 +38,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "JER": {
@@ -52,7 +52,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "JRJ": {
@@ -66,7 +66,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "RAW": {
@@ -80,7 +80,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "TGF": {
@@ -94,7 +94,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "KWD": {
@@ -108,7 +108,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     },
     "JMG": {
@@ -122,8 +122,7 @@
         "Aug": "Yes",
         "Sep": "Yes",
         "Oct": "Yes",
-        "Yesv": "Yes",
+        "Nov": "Yes",
         "Dec": "Yes"
     }
-    
 }
