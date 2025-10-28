@@ -134,7 +134,24 @@ if not visible_tabs:
     st.warning("⚠️ You don’t have access to any dashboards.")
     st.stop()
 
-# Date filters
+def ensure_tz(df, col):
+    if col in df.columns:
+        df[col] = pd.to_datetime(df[col], errors="coerce")
+        if df[col].dt.tz is None:
+            df[col] = df[col].dt.tz_localize(local_tz)
+        else:
+            df[col] = df[col].dt.tz_convert(local_tz)
+
+
+# ✅ Localize all relevant columns
+ensure_tz(revenue, "TimeEntryDate")
+ensure_tz(billable_hours, "BillableHoursDate")
+ensure_tz(matters, "MatterCreationDate")
+
+# ✅ Get today in local time
+today = pd.Timestamp.now(tz=local_tz).normalize()
+
+# ✅ Compute min/max across datasets (all tz-aware now)
 min_date = min(
     revenue["TimeEntryDate"].min(),
     billable_hours["BillableHoursDate"].min(),
@@ -146,19 +163,29 @@ max_date = max(
     matters["MatterCreationDate"].max(),
 )
 
+# ✅ Force both sides of comparisons to share same tz
+min_date = min_date.tz_convert(local_tz)
+max_date = max_date.tz_convert(local_tz)
+
+# ✅ Define logical bounds
 start_of_year = pd.Timestamp(today.year, 1, 1, tz=local_tz)
-min_date = max(min_date, pd.Timestamp("2020-01-01", tz=local_tz))
+baseline = pd.Timestamp("2025-01-01", tz=local_tz)
+
+# 🧩 Use tz-aware comparisons safely
+min_date = max(min_date, baseline)
 default_start_date = max(start_of_year, min_date)
 default_end_date = min(today, max_date)
 
-min_date_naive = min_date.tz_convert(local_tz).date()
-max_date_naive = max_date.tz_convert(local_tz).date()
-default_start_naive = default_start_date.tz_convert(local_tz).date()
-default_end_naive = default_end_date.tz_convert(local_tz).date()
+# ✅ Convert to naive dates for Streamlit widget
+min_date_naive = min_date.tz_localize(None).date()
+max_date_naive = max_date.tz_localize(None).date()
+default_start_naive = default_start_date.tz_localize(None).date()
+default_end_naive = default_end_date.tz_localize(None).date()
 
+# ✅ Sidebar date picker
 date_range = st.sidebar.date_input(
     "Select Date Range",
-    [default_start_date, default_end_date],
+    [default_start_naive, default_end_naive],
     min_value=min_date_naive,
     max_value=max_date_naive,
 )
