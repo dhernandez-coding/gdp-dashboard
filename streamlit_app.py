@@ -138,23 +138,20 @@ def ensure_tz(df, col):
     if col in df.columns:
         df[col] = pd.to_datetime(df[col], errors="coerce")
 
-        # 🔹 If timestamps are naive, assume they are local Chicago time (not UTC)
-        if df[col].dt.tz is None:
+        # ✅ Localize if naive, otherwise convert
+        if df[col].dt.tz is None or df[col].dt.tz.unique()[0] is None:
             df[col] = df[col].dt.tz_localize("America/Chicago")
         else:
             df[col] = df[col].dt.tz_convert("America/Chicago")
 
-        # 🔹 Normalize to local midnight for safety
-        df[col] = df[col].dt.tz_convert("America/Chicago").dt.floor("D")
+        # ✅ Normalize to midnight local time
+        df[col] = df[col].dt.floor("D")
 
 
 # ✅ Localize all relevant columns
 ensure_tz(revenue, "TimeEntryDate")
 ensure_tz(billable_hours, "BillableHoursDate")
 ensure_tz(matters, "MatterCreationDate")
-
-# ✅ Get today in local time
-today = pd.Timestamp.now(tz=local_tz).normalize()
 
 # ✅ Compute min/max
 min_date = min(
@@ -168,10 +165,11 @@ max_date = max(
     matters["MatterCreationDate"].max(),
 )
 
-# ✅ Adjust for inclusivity and ensure tz consistency
+# ✅ Adjust for inclusivity and timezone
 max_date = max_date.tz_convert(local_tz) + pd.Timedelta(days=1)
 min_date = min_date.tz_convert(local_tz)
 
+# ✅ Define bounds
 start_of_year = pd.Timestamp(today.year, 1, 1, tz=local_tz)
 baseline = pd.Timestamp("2025-01-01", tz=local_tz)
 
@@ -179,13 +177,14 @@ min_date = max(min_date, baseline)
 default_start_date = max(start_of_year, min_date)
 default_end_date = min(today, max_date)
 
-# ✅ Convert to .date() for Streamlit
+# ✅ Streamlit date picker (naive dates)
 date_range = st.sidebar.date_input(
     "Select Date Range",
     [default_start_date.date(), default_end_date.date()],
     min_value=min_date.date(),
     max_value=max_date.date(),
 )
+
 st.write("Latest date in:", max_date)
 st.write("Min date in:", min_date)
 
