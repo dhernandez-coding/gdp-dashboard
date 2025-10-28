@@ -138,14 +138,14 @@ def ensure_tz(df, col):
     if col in df.columns:
         df[col] = pd.to_datetime(df[col], errors="coerce")
 
-        # ✅ Localize if naive, otherwise convert
-        if df[col].dt.tz is None or df[col].dt.tz.unique()[0] is None:
-            df[col] = df[col].dt.tz_localize("America/Chicago")
-        else:
-            df[col] = df[col].dt.tz_convert("America/Chicago")
+        # ✅ Remove any implicit UTC meaning — treat as local timestamps
+        df[col] = df[col].dt.tz_localize(None)
 
-        # ✅ Normalize to midnight local time
-        df[col] = df[col].dt.floor("D")
+        # ✅ Now tag as America/Chicago (no shifting)
+        df[col] = df[col].dt.tz_localize("America/Chicago")
+
+        # ✅ Don't floor here — keep actual times (important!)
+        # df[col] = df[col].dt.floor("D")   
 
 
 # ✅ Localize all relevant columns
