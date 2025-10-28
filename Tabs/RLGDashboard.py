@@ -321,14 +321,19 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
         filtered_team_hours.groupby(["Week", "Staff"], as_index=False)["BillableHoursAmount"].sum()
     )
 
-    # 4) Build calendar last-6-week grid up to end_date (so gray bars always have x)
+    # ✅ Include the week of Oct 20 and all future weeks
+    cutoff_date = pd.to_datetime("2025-10-20")
+    
+    # Compute all recent weeks (same logic)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
-    recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]  # oldest → newest
-
-    # Apply cutoff if desired
+    recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
+    
+    # ✅ Keep only weeks on or after Oct 20
     recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
-    if not recent_weeks:  # fallback to end_week if all weeks were cut off
-        recent_weeks = [end_week]
+    
+    # ✅ If everything gets filtered out (e.g., end_date < 20th), fallback to last 6 weeks
+    if not recent_weeks:
+        recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
 
     # 5) Cross product: (recent weeks × all staff in settings)
     custom_staff_list = st.session_state["custom_staff_list"]
