@@ -8,6 +8,9 @@ from auth import login, logout
 import datetime
 import numpy as np
 import json
+import pytz
+
+local_tz = pytz.timezone("America/Chicago")
 
 
 # ----------------------------------------------------------------------------
@@ -108,7 +111,7 @@ st.markdown("---")
 
 # ----------------------------------------------------------------------------
 # ✅ Sidebar Navigation & Filters
-today = pd.Timestamp.today()
+today = pd.Timestamp.now(tz=local_tz).normalize()
 st.sidebar.header("Filter Data by Date")
 
 username = st.session_state.get("username", "User")
@@ -143,16 +146,21 @@ max_date = max(
     matters["MatterCreationDate"].max(),
 )
 
-start_of_year = pd.Timestamp(today.year, 1, 1)
-min_date = max(min_date, pd.Timestamp("2020-01-01"))
+start_of_year = pd.Timestamp(today.year, 1, 1, tz=local_tz)
+min_date = max(min_date, pd.Timestamp("2020-01-01", tz=local_tz))
 default_start_date = max(start_of_year, min_date)
 default_end_date = min(today, max_date)
+
+min_date_naive = min_date.tz_convert(local_tz).date()
+max_date_naive = max_date.tz_convert(local_tz).date()
+default_start_naive = default_start_date.tz_convert(local_tz).date()
+default_end_naive = default_end_date.tz_convert(local_tz).date()
 
 date_range = st.sidebar.date_input(
     "Select Date Range",
     [default_start_date, default_end_date],
-    min_value=min_date,
-    max_value=max_date,
+    min_value=min_date_naive,
+    max_value=max_date_naive,
 )
 show_goals = st.sidebar.checkbox("Show Goal Lines", value=True)
 
