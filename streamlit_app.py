@@ -137,10 +137,15 @@ if not visible_tabs:
 def ensure_tz(df, col):
     if col in df.columns:
         df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        # 🔹 If timestamps are naive, assume they are local Chicago time (not UTC)
         if df[col].dt.tz is None:
-            df[col] = df[col].dt.tz_localize(local_tz)
+            df[col] = df[col].dt.tz_localize("America/Chicago")
         else:
-            df[col] = df[col].dt.tz_convert(local_tz)
+            df[col] = df[col].dt.tz_convert("America/Chicago")
+
+        # 🔹 Normalize to local midnight for safety
+        df[col] = df[col].dt.tz_convert("America/Chicago").dt.floor("D")
 
 
 # ✅ Localize all relevant columns
@@ -151,7 +156,7 @@ ensure_tz(matters, "MatterCreationDate")
 # ✅ Get today in local time
 today = pd.Timestamp.now(tz=local_tz).normalize()
 
-# ✅ Compute min/max across datasets (all tz-aware now)
+# ✅ Compute min/max
 min_date = min(
     revenue["TimeEntryDate"].min(),
     billable_hours["BillableHoursDate"].min(),
@@ -163,43 +168,26 @@ max_date = max(
     matters["MatterCreationDate"].max(),
 )
 
-# ✅ Force both sides of comparisons to share same tz
+# ✅ Adjust for inclusivity and ensure tz consistency
+max_date = max_date.tz_convert(local_tz) + pd.Timedelta(days=1)
 min_date = min_date.tz_convert(local_tz)
-max_date = max_date.tz_convert(local_tz)
 
-# ✅ Define logical bounds
 start_of_year = pd.Timestamp(today.year, 1, 1, tz=local_tz)
 baseline = pd.Timestamp("2025-01-01", tz=local_tz)
 
-# 🧩 Use tz-aware comparisons safely
 min_date = max(min_date, baseline)
 default_start_date = max(start_of_year, min_date)
 default_end_date = min(today, max_date)
 
-# ✅ Normalize to local timezone first
-min_date_local = min_date.tz_convert(local_tz).normalize()
-max_date_local = max_date.tz_convert(local_tz).normalize()
-default_start_local = default_start_date.tz_convert(local_tz).normalize()
-default_end_local = default_end_date.tz_convert(local_tz).normalize()
-
-# ✅ Add one-day margin so Streamlit can select the last date inclusively
-max_date_local += pd.Timedelta(days=1)
-
-# ✅ Convert to plain Python dates for Streamlit
-min_date_naive = min_date_local.date()
-max_date_naive = max_date_local.date()
-default_start_naive = default_start_local.date()
-default_end_naive = default_end_local.date()
-
-# ✅ Sidebar date picker
+# ✅ Convert to .date() for Streamlit
 date_range = st.sidebar.date_input(
     "Select Date Range",
-    [default_start_naive, default_end_naive],
-    min_value=min_date_naive,
-    max_value=max_date_naive,
+    [default_start_date.date(), default_end_date.date()],
+    min_value=min_date.date(),
+    max_value=max_date.date(),
 )
-st.write("Latest date in:",max_date_naive )
-st.write("min date in", min_date_naive)
+st.write("Latest date in:", max_date)
+st.write("Min date in:", min_date)
 
 show_goals = st.sidebar.checkbox("Show Goal Lines", value=True)
 
