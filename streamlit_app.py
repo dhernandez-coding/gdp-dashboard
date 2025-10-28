@@ -176,11 +176,20 @@ min_date = max(min_date, baseline)
 default_start_date = max(start_of_year, min_date)
 default_end_date = min(today, max_date)
 
-# ✅ Convert to naive dates for Streamlit widget
-min_date_naive = min_date.tz_localize(None).date()
-max_date_naive = max_date.tz_localize(None).date()
-default_start_naive = default_start_date.tz_localize(None).date()
-default_end_naive = default_end_date.tz_localize(None).date()
+# ✅ Normalize to local timezone first
+min_date_local = min_date.tz_convert(local_tz).normalize()
+max_date_local = max_date.tz_convert(local_tz).normalize()
+default_start_local = default_start_date.tz_convert(local_tz).normalize()
+default_end_local = default_end_date.tz_convert(local_tz).normalize()
+
+# ✅ Add one-day margin so Streamlit can select the last date inclusively
+max_date_local += pd.Timedelta(days=1)
+
+# ✅ Convert to plain Python dates for Streamlit
+min_date_naive = min_date_local.date()
+max_date_naive = max_date_local.date()
+default_start_naive = default_start_local.date()
+default_end_naive = default_end_local.date()
 
 # ✅ Sidebar date picker
 date_range = st.sidebar.date_input(
@@ -189,6 +198,9 @@ date_range = st.sidebar.date_input(
     min_value=min_date_naive,
     max_value=max_date_naive,
 )
+st.write("Latest date in:",max_date_naive )
+st.write("min date in", min_date_naive)
+
 show_goals = st.sidebar.checkbox("Show Goal Lines", value=True)
 
 start_date = pd.Timestamp(date_range[0])
