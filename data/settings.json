@@ -1,5 +1,5 @@
 {
-    "treshold_hours": 205,
+    "treshold_hours": 225,
     "treshold_revenue": 2200000,
     "custom_staff_list": [
         "AEZ",
@@ -19,9 +19,9 @@
         "JER": 30,
         "JRJ": 40,
         "RAW": 25,
-        "TGF": 15,
+        "TGF": 35,
         "KWD": 20,
         "JMG": 20
     },
-    "last_updated_at": "2025-10-28T18:13:30.796386"
+    "last_updated_at": "2025-10-28T18:14:02.960961"
 }
