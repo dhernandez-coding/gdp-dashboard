@@ -64,10 +64,6 @@ revenue, billable_hours, matters = load_data()
 
 def run_rlg_dashboard(start_date, end_date, show_goals):
 
-    st.write("Latest date in revenue:", revenue["RevShareDate"].max())
-    st.write("Latest date in billable_hours:", billable_hours["BillableHoursDate"].max())
-    st.write("Latest date in matters:", matters["MatterCreationDate"].max())
-
     treshold_hours = st.session_state["treshold_hours"]
     treshold_revenue = st.session_state["treshold_revenue"]
 
@@ -229,18 +225,21 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ Convert BillableHoursDate to Weekly Period & Aggregate
     # 🎯 PLOT 1: Cumulative Revenue (Bar Chart)
     with col1:
-    
-        # ✅ REVENUE PER STAFF (Bar Chart)
+    # ✅ Aggregate total YTD revenue per staff
+        revenue_per_staff_total = (
+            filtered_revenue.groupby("Staff", as_index=False)["Total"].sum()
+        )
         fig1 = px.bar(
-            filtered_revenue,
+            revenue_per_staff_total,
             x="Staff",
             y="Total",
             color="Staff",
-            title=f"{selected_year} Individual YTD Revenue",
+            title=f"{selected_year} Individual YTD Revenue (Total)",
             labels={"Total": "Revenue ($)"},
             color_discrete_sequence=[PRIMARY_COLOR],
-            hover_data=[]
+            hover_data={"Total": ":,.0f"},
         )
+
         # ✅ Add a horizontal line for the threshold revenue per staff
         if show_goals:
             fig1.add_hline(
@@ -248,9 +247,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 line_dash="dash",
                 line_color="red",
             )
-
             fig1.add_annotation(
-                x=filtered_revenue["Staff"].max(),  # rightmost staff member on x-axis
+                x=revenue_per_staff_total["Staff"].max(),
                 y=treshold_revenue_staff,
                 text=f"Goal: ${treshold_revenue_staff:,.0f}",
                 showarrow=False,
@@ -262,9 +260,17 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 borderpad=4,
                 xanchor="left",
                 yanchor="bottom"
-            ) 
-        fig1.update_layout(xaxis_title="", yaxis_title="Revenue ($)", showlegend=False)
-        fig1.update_traces(hoverinfo="skip", hovertemplate=None)
+            )
+
+        fig1.update_layout(
+            xaxis_title="",
+            yaxis_title="Total Revenue ($)",
+            showlegend=False,
+            yaxis_tickformat=",",
+            uniformtext_minsize=10,
+            uniformtext_mode='hide'
+        )
+        fig1.update_traces(hovertemplate="<b>%{x}</b><br>Total Revenue: $%{y:,.0f}<extra></extra>")
         st.plotly_chart(fig1, use_container_width=True)
 
 
@@ -323,14 +329,14 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     # ✅ Include the week of Oct 20 and all future weeks
     cutoff_date = pd.to_datetime("2025-10-20")
-    
+
     # Compute all recent weeks (same logic)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
     recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
-    
+
     # ✅ Keep only weeks on or after Oct 20
     recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
-    
+
     # ✅ If everything gets filtered out (e.g., end_date < 20th), fallback to last 6 weeks
     if not recent_weeks:
         recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]

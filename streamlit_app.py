@@ -69,7 +69,7 @@ else:
 
 # ----------------------------------------------------------------------------
 # ✅ Load Data Function
-@st.cache_data(ttl=86400)  # Cache for 24 hours
+@st.cache_data(ttl=0)  # Cache for 24 hours
 def load_data():
     data_path = Path(__file__).parent / "data"
     revenue = pd.read_csv(data_path / "vTimeEntries.csv", parse_dates=["TimeEntryDate"])
@@ -185,8 +185,6 @@ date_range = st.sidebar.date_input(
     max_value=max_date.date(),
 )
 
-st.write("Latest date in:", max_date)
-st.write("Min date in:", min_date)
 
 show_goals = st.sidebar.checkbox("Show Goal Lines", value=True)
 
