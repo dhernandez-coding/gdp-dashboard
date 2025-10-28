@@ -7,11 +7,15 @@ import datetime
 import numpy as np
 import json
 from Tabs import Settings
+import pytz
+
+
+local_tz = pytz.timezone("America/Chicago") 
 
 # ✅ Set default date range (One year ago to today)
 PREBILLS_FILE = Path(__file__).parents[1] / "data" / "prebills.json"
 
-today = pd.Timestamp.today()
+today = datetime.datetime.now(local_tz).date()
 default_start_date = today - pd.DateOffset(years=1)
 default_end_date = pd.to_datetime(today).to_period("M").end_time ##- pd.DateOffset(days=2)
 
@@ -59,6 +63,10 @@ def load_data():
 revenue, billable_hours, matters = load_data()
 
 def run_rlg_dashboard(start_date, end_date, show_goals):
+
+    st.write("Latest date in revenue:", revenue["RevShareDate"].max())
+    st.write("Latest date in billable_hours:", billable_hours["BillableHoursDate"].max())
+    st.write("Latest date in matters:", matters["MatterCreationDate"].max())
 
     treshold_hours = st.session_state["treshold_hours"]
     treshold_revenue = st.session_state["treshold_revenue"]

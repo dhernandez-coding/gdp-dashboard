@@ -86,9 +86,9 @@ def save_prebills_to_github(prebills_data: dict):
     # --- Commit to GitHub ---
     put_response = requests.put(url, headers=headers, data=json.dumps(data))
     if put_response.status_code in (200, 201):
-        st.toast("✅ Prebills updated in GitHub", icon="💾")
+        st.toast("Prebills updated in GitHub", icon="💾")
     else:
-        st.error(f"❌ Failed to update prebills.json: {put_response.status_code}")
+        st.error(f"Failed to update prebills.json: {put_response.status_code}")
         st.write(put_response.text)
 
 def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
@@ -109,7 +109,7 @@ def auto_save_settings(updated_staff_list, updated_goals, new_revenue):
 
     push_to_github_serialized(save_threshold_settings, updated_settings)
     st.session_state.update(updated_settings)
-    st.toast("✅ Auto-saved settings", icon="💾")
+    st.toast("Auto-saved settings", icon="💾")
 
 
 def load_threshold_settings():
@@ -130,7 +130,7 @@ def load_threshold_settings():
             return settings
 
         except Exception as e:
-            st.warning(f"⚠️ Settings file invalid ({e}). Using last known good settings if available.")
+            st.warning(f"Settings file invalid ({e}). Using last known good settings if available.")
             if "last_valid_settings" in st.session_state:
                 return st.session_state["last_valid_settings"]
             else:
@@ -330,7 +330,7 @@ def run_settings():
         # Refresh session state
         st.session_state.update(updated_settings)
 
-        st.success(f"✅ Settings saved! Total weekly threshold: {total_weekly_goal} hours")
+        st.success(f"Settings saved! Total weekly threshold: {total_weekly_goal} hours")
 
     # ---------------------------------------------------------
     # Live preview table
@@ -344,7 +344,7 @@ def run_settings():
         )
         st.dataframe(preview, use_container_width=True)
     else:
-        st.warning("⚠️ No staff members defined.")
+        st.warning("No staff members defined.")
 
     # ---------------------------------------------------------
     # ✅ Prebills section (unchanged)
@@ -369,7 +369,7 @@ def run_settings():
                 if content:
                     prebills_data = json.loads(content)
         except json.JSONDecodeError:
-            st.warning("⚠️ The prebills file is corrupted or empty. Initializing fresh data.")
+            st.warning("The prebills file is corrupted or empty. Initializing fresh data.")
 
     for staff in current_staff_list:
         if staff not in prebills_data:
@@ -406,4 +406,4 @@ def run_settings():
 
         if st.form_submit_button("Save"):
             push_to_github_serialized(save_prebills_to_github, updated_data)
-            st.success("✅ Prebills matrix saved and synced to GitHub!")
+            st.success("Prebills matrix saved and synced to GitHub!")
