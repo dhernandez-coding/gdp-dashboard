@@ -188,7 +188,7 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
 
         kpi_revenue.metric("Total Production Revenue", f"${total_revenue:,.0f}")
         kpi_hours.metric("Total Hours", f"{Amount:,.0f} hours")
-        kpi_share.metric("Total Share", f"${total_revenue_share:,.0f}")
+        kpi_share.metric("Total Revenue Share", f"${total_revenue_share:,.0f}")
 
         # Plot
         st.subheader(f"Payout Summary for {staff_selected}")
