@@ -64,6 +64,7 @@ revenue, billable_hours, matters = load_data()
 
 def run_rlg_dashboard(start_date, end_date, show_goals):
 
+
     treshold_hours = st.session_state["treshold_hours"]
     treshold_revenue = st.session_state["treshold_revenue"]
 
@@ -333,6 +334,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # Compute all recent weeks (same logic)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
     recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
+    st.write("End date:", end_date)
+    st.write("Recent weeks:", recent_weeks)
 
     # ✅ Keep only weeks on or after Oct 20
     recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
