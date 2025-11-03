@@ -273,33 +273,55 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     # 🎯 PLOT 2: CumulativeRevenue (Bar Chart)
     with col2:
+    # ✅ Round to avoid float precision noise
+        ytd_revenue["Total"] = ytd_revenue["Total"].round(2)
+        ytd_revenue["CumulativeRevenue"] = ytd_revenue["CumulativeRevenue"].round(2)
     
+        # ✅ Prepare data and custom hover text
         fig_ytd_revenue = px.bar(
             ytd_revenue,
-            x="MonthLabel",  # ✅ Use formatted month labels
+            x="MonthLabel",
             y="CumulativeRevenue",
             title=f"YTD Revenue ({selected_year})",
-            labels={"CumulativeRevenue": "Cumulative Revenue ($)", "MonthLabel": "Month"},
-            color_discrete_sequence=[PRIMARY_COLOR] # ✅ Generate a sample goal revenue
-        )   
+            labels={
+                "CumulativeRevenue": "Cumulative Revenue ($)",
+                "Total": "Monthly Revenue ($)",
+                "MonthLabel": "Month"
+            },
+            color_discrete_sequence=[PRIMARY_COLOR]
+        )
+    
+        # ✅ Use custom hover template for perfect formatting
+        fig_ytd_revenue.update_traces(
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Monthly Revenue ($): %{customdata[0]:,.2f}<br>"
+                "Cumulative Revenue ($): %{y:,.2f}<extra></extra>"
+            ),
+            customdata=ytd_revenue[["Total"]].to_numpy()
+        )
+    
+        # ✅ Add goal line
         if show_goals:
             fig_ytd_revenue.add_scatter(
-                x=ytd_revenue["MonthLabel"], 
+                x=ytd_revenue["MonthLabel"],
                 y=ytd_revenue["GoalRevenue"],
                 mode="lines",
                 name="Goal Revenue",
-                line=dict(color="red", dash="dash")  # Green dashed line for clarity
+                line=dict(color="red", dash="dash")
             )
-        # ✅ Step 11: Ensure the X-axis shows **exactly 12 months**
+    
+        # ✅ Layout
         fig_ytd_revenue.update_layout(
             xaxis_title="Month",
             yaxis_title="Cumulative Revenue ($)",
             xaxis=dict(
                 tickmode="array",
-                tickvals=ytd_revenue["MonthLabel"],  # ✅ Ensures all 12 months are displayed
-                ticktext=ytd_revenue["MonthLabel"]  # ✅ Show "Jan 2025", "Feb 2025", ..., "Dec 2025"
+                tickvals=ytd_revenue["MonthLabel"],
+                ticktext=ytd_revenue["MonthLabel"]
             )
         )
+    
         st.plotly_chart(fig_ytd_revenue, use_container_width=True)
 
 
