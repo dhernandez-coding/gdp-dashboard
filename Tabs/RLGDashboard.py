@@ -334,9 +334,6 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # Compute all recent weeks (same logic)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
     recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
-    st.write("Distinct Staff:", filtered_team_hours["Staff"].unique())
-    st.write("JRJ entries:", filtered_team_hours.query("Staff == 'JRJ'")[["BillableHoursDate","BillableHoursAmount"]])
-
 
     # ✅ Keep only weeks on or after Oct 20
     recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
