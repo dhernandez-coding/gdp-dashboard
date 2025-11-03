@@ -8,6 +8,7 @@ import numpy as np
 import json
 from Tabs import Settings
 import pytz
+from data_loader import load_data
 
 
 local_tz = pytz.timezone("America/Chicago") 
@@ -37,30 +38,8 @@ custom_palette = [
     "#F0E68C",  # khaki yellow (softer)
 ]
 
-def load_data():
-    """Load datasets from the /data folder and preprocess dates."""
-    data_path = Path(__file__).parents[1] / "data"
-
-    # Load CSVs
-    revenue = pd.read_csv(data_path / "RevShareNewLogic.csv", parse_dates=["RevShareDate"])
-    billable_hours = pd.read_csv(data_path / "vBillableHoursStaff.csv", parse_dates=["BillableHoursDate"])
-    matters = pd.read_csv(data_path / "vMatters.csv", parse_dates=["MatterCreationDate"])
-    
-
-    # ✅ Apply Date Transformations Once (for efficiency)
-    billable_hours["Month"] = billable_hours["BillableHoursDate"].dt.to_period("M").astype(str)
-    billable_hours["Week"] = billable_hours["BillableHoursDate"] - pd.to_timedelta(billable_hours["BillableHoursDate"].dt.dayofweek, unit="D")
-
-    revenue["MonthDate"] = revenue["RevShareDate"].dt.to_period("M").dt.to_timestamp()
-    revenue["WeekDate"] = revenue["RevShareDate"] - pd.to_timedelta(revenue["RevShareDate"].dt.dayofweek, unit="D")
-
-    matters["Week"] = matters["MatterCreationDate"] - pd.to_timedelta(matters["MatterCreationDate"].dt.dayofweek, unit="D")
-
-    return revenue, billable_hours, matters
-
-
 # Load data
-revenue, billable_hours, matters = load_data()
+revenue, billable_hours, matters,_  = load_data()
 
 def run_rlg_dashboard(start_date, end_date, show_goals):
 
@@ -69,6 +48,8 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     treshold_revenue = st.session_state["treshold_revenue"]
 
     custom_staff_list = st.session_state["custom_staff_list"]
+    if "custom_staff_list" not in st.session_state:
+        st.session_state["custom_staff_list"] = ["AEZ","BPL","CAJ","JER","JRJ","RAW","TGF","KWD","JMG"]
     treshold_revenue_staff = treshold_revenue / float(len(custom_staff_list))
     treshold_hours_staff_monthly = treshold_hours * 4
     treshold_hours_staff_weekly = treshold_hours
@@ -145,7 +126,6 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
     prior_month = (pd.Timestamp.today() - pd.DateOffset(months=1)).to_period("M").strftime("%Y-%m")
     
-    
     #------------------------------------------YTD CALCULATIONS-------------------------------------------- 
     # ✅ Step 1: Get the selected year from `end_date`
     selected_year = end_date.year
@@ -197,15 +177,31 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     months_in_year = 12
     ytd_revenue["GoalRevenue"] = (ytd_revenue["MonthNumber"] / months_in_year) * treshold_revenue
     
-    #----Month Filtering --------------------------------------------------
-    current_month_hours = total_team_hours_monthly.loc[
-        total_team_hours_monthly["Month"] == current_month, "BillableHoursAmount"
-    ].sum()
-    
-    prior_month_hours = total_team_hours_monthly.loc[
-        total_team_hours_monthly["Month"] == prior_month, "BillableHoursAmount"
-    ].sum()
-    # ---------------------------------------------------------------------------- 
+    # ----Month Filtering --------------------------------------------------
+
+    # Create a normalized period version (safe; does not overwrite Month)
+    total_team_hours_monthly["MonthPeriod"] = pd.PeriodIndex(total_team_hours_monthly["Month"], freq="M")
+
+    # Detect the latest month that actually exists in your dataset
+    if not total_team_hours_monthly.empty:
+        latest_month_period = total_team_hours_monthly["MonthPeriod"].max()
+        prior_month_period = latest_month_period - 1
+    else:
+        latest_month_period = None
+        prior_month_period = None
+
+    # Compute sums safely
+    if latest_month_period is not None:
+        current_month_hours = total_team_hours_monthly.loc[
+            total_team_hours_monthly["MonthPeriod"] == latest_month_period, "BillableHoursAmount"
+        ].sum()
+
+        prior_month_hours = total_team_hours_monthly.loc[
+            total_team_hours_monthly["MonthPeriod"] == prior_month_period, "BillableHoursAmount"
+        ].sum()
+    else:
+        current_month_hours = 0
+        prior_month_hours = 0
         
     # ✅ KPI METRICS (Dynamically Updating)
     total_revenue = filtered_revenue["Total"].sum()

@@ -1,14 +1,28 @@
 import streamlit as st
+from pathlib import Path
+# ----------------------------------------------------------------------------
+# ✅ Page Configuration
+logo_path = Path(__file__).parent / "data" / "resolution.png"
+
+st.set_page_config(
+    page_title="RLG App",
+    page_icon=str(logo_path) if logo_path.exists() else "📊",
+    layout="wide",
+)
+
+# ----------------------------------------------------------------------------
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from pathlib import Path
+import time
 from Tabs import Settings, RLGDashboard, RevShare
 from auth import login, logout
 import datetime
 import numpy as np
 import json
 import pytz
+from data_loader import load_data
 
 local_tz = pytz.timezone("America/Chicago")
 
@@ -49,17 +63,7 @@ if (
         "staff_weekly_goals", Settings.DEFAULT_STAFF_WEEKLY_GOALS.copy()
     )
 
-# ----------------------------------------------------------------------------
-# ✅ Page Configuration
-logo_path = Path(__file__).parent / "data" / "resolution.png"
 
-st.set_page_config(
-    page_title="RLG App",
-    page_icon=str(logo_path) if logo_path.exists() else "📊",
-    layout="wide",
-)
-
-# ----------------------------------------------------------------------------
 # ✅ Authentication Logic
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     login()
@@ -68,33 +72,9 @@ else:
     logout()  # Sidebar logout button
 
 # ----------------------------------------------------------------------------
-# ✅ Load Data Function
-@st.cache_data(ttl=0)  # Cache for 24 hours
-def load_data():
-    data_path = Path(__file__).parent / "data"
-    revenue = pd.read_csv(data_path / "vTimeEntries.csv", parse_dates=["TimeEntryDate"])
-    billable_hours = pd.read_csv(data_path / "vBillableHoursStaff.csv", parse_dates=["BillableHoursDate"])
-    matters = pd.read_csv(data_path / "vMatters.csv", parse_dates=["MatterCreationDate"])
-
-    billable_hours["Month"] = billable_hours["BillableHoursDate"].dt.to_period("M").astype(str)
-    billable_hours["Week"] = billable_hours["BillableHoursDate"] - pd.to_timedelta(
-        billable_hours["BillableHoursDate"].dt.dayofweek, unit="D"
-    )
-
-    revenue["Month"] = revenue["TimeEntryDate"].dt.to_period("M").astype(str)
-    revenue["Week"] = revenue["TimeEntryDate"] - pd.to_timedelta(
-        revenue["TimeEntryDate"].dt.dayofweek, unit="D"
-    )
-
-    matters["Week"] = matters["MatterCreationDate"] - pd.to_timedelta(
-        matters["MatterCreationDate"].dt.dayofweek, unit="D"
-    )
-
-    return revenue, billable_hours, matters
-
 
 # ✅ Load Data
-revenue, billable_hours, matters = load_data()
+revenue, billable_hours, matters, mtime_key = load_data()
 
 # ----------------------------------------------------------------------------
 # ✅ HEADER WITH COMPANY LOGO
@@ -112,18 +92,69 @@ st.markdown("---")
 # ----------------------------------------------------------------------------
 # ✅ Sidebar Navigation & Filters
 today = pd.Timestamp.now(tz=local_tz).normalize()
-st.sidebar.header("Filter Data by Date")
+# st.sidebar.header("Filter Data by Date")
 
 username = st.session_state.get("username", "User")
 allowed_tabs = st.session_state.get("allowed_tabs", [])
 
+# --- Show last data update timestamp ---
+try:
+    last_update = None
+    if "mtime_key" in locals() and mtime_key:
+        # If mtime_key is a tuple (multiple file modification times)
+        if isinstance(mtime_key, (tuple, list)):
+            mtime_key = max(mtime_key)  # use the most recent one
+
+        # Convert UNIX timestamp or datetime
+        if isinstance(mtime_key, (int, float)):
+            last_update = datetime.datetime.fromtimestamp(mtime_key, tz=local_tz)
+        else:
+            last_update = pd.to_datetime(mtime_key, errors="coerce")
+
+    if last_update is not None and pd.notna(last_update):
+        formatted_time = last_update.strftime("%b %d, %Y %I:%M %p")
+        st.sidebar.markdown(
+            f"<p style='font-size:11px; color:gray; margin-top:-8px;'>Last data update: {formatted_time}</p>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.sidebar.markdown(
+            "<p style='font-size:11px; color:gray; margin-top:-8px;'>Last data update: Unknown</p>",
+            unsafe_allow_html=True,
+        )
+
+except Exception as e:
+    st.sidebar.markdown(
+        f"<p style='font-size:11px; color:gray;'>Last data update: Error</p>",
+        unsafe_allow_html=True,
+    )
+
 st.sidebar.markdown(f"**Logged in as:** {username}")
+
+# --- Button ---
+if st.sidebar.button("🔄 Reload data"):
+    st.session_state["reload_triggered"] = True
+    st.session_state["reload_time"] = time.time()
+    st.cache_data.clear()
+    st.rerun()
+
+# --- During reload ---
+if st.session_state.get("reload_triggered"):
+    elapsed = time.time() - st.session_state.get("reload_time", 0)
+    if elapsed < 2:  # show spinner for ~2s
+        with st.sidebar:
+            st.info("♻️ Reloading data... please wait.")
+            st.progress(min(int(elapsed * 50), 100))  # simple animation
+        time.sleep(0.5)
+        st.rerun()
+    else:
+        st.session_state["reload_triggered"] = False
 
 # Define all available tabs with their display names
 tab_options = {
     "RLGDashboard": ("RLG Dashboard", lambda: RLGDashboard.run_rlg_dashboard(start_date, end_date, show_goals)),
-    "Settings": ("Settings", lambda: Settings.run_settings()),
     "RevShare": ("Revenue Share", lambda: RevShare.run_revshare(start_date, end_date)),
+    "Settings": ("Settings", lambda: Settings.run_settings()),
 }
 
 # Filter visible tabs based on permissions
@@ -149,18 +180,18 @@ def ensure_tz(df, col):
 
 
 # ✅ Localize all relevant columns
-ensure_tz(revenue, "TimeEntryDate")
+ensure_tz(revenue, "RevShareDate")
 ensure_tz(billable_hours, "BillableHoursDate")
 ensure_tz(matters, "MatterCreationDate")
 
 # ✅ Compute min/max
 min_date = min(
-    revenue["TimeEntryDate"].min(),
+    revenue["RevShareDate"].min(),
     billable_hours["BillableHoursDate"].min(),
     matters["MatterCreationDate"].min(),
 )
 max_date = max(
-    revenue["TimeEntryDate"].max(),
+    revenue["RevShareDate"].max(),
     billable_hours["BillableHoursDate"].max(),
     matters["MatterCreationDate"].max(),
 )
