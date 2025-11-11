@@ -87,7 +87,11 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     filtered_team_hours["Week"] = filtered_team_hours["BillableHoursDate"] - pd.to_timedelta(filtered_team_hours["BillableHoursDate"].dt.dayofweek, unit="D")
     filtered_revenue["Total"]=filtered_revenue["TotalRevShareMonth"] + filtered_revenue["OriginationFees"]
     # ✅ Identify the Last Selected Month from Date Slider
-    last_selected_month = max(filtered_revenue["MonthDate"])  # Last selected month
+    if filtered_revenue.empty or filtered_revenue["MonthDate"].isna().all():
+        st.warning("⚠️ No revenue data found for the selected date range.")
+        return  # or handle gracefully (e.g., display empty chart)
+    
+    last_selected_month = filtered_revenue["MonthDate"].max()
 
     # ✅ 1️⃣ Revenue Per Staff (Monthly)
     revenue_per_staff_monthly = (
@@ -276,7 +280,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
     # ✅ Round to avoid float precision noise
         ytd_revenue["Total"] = ytd_revenue["Total"].round(2)
         ytd_revenue["CumulativeRevenue"] = ytd_revenue["CumulativeRevenue"].round(2)
-    
+
         # ✅ Prepare data and custom hover text
         fig_ytd_revenue = px.bar(
             ytd_revenue,
@@ -290,7 +294,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             },
             color_discrete_sequence=[PRIMARY_COLOR]
         )
-    
+
         # ✅ Use custom hover template for perfect formatting
         fig_ytd_revenue.update_traces(
             hovertemplate=(
@@ -300,7 +304,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
             ),
             customdata=ytd_revenue[["Total"]].to_numpy()
         )
-    
+
         # ✅ Add goal line
         if show_goals:
             fig_ytd_revenue.add_scatter(
@@ -310,7 +314,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 name="Goal Revenue",
                 line=dict(color="red", dash="dash")
             )
-    
+
         # ✅ Layout
         fig_ytd_revenue.update_layout(
             xaxis_title="Month",
@@ -321,7 +325,7 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
                 ticktext=ytd_revenue["MonthLabel"]
             )
         )
-    
+
         st.plotly_chart(fig_ytd_revenue, use_container_width=True)
 
 
