@@ -355,14 +355,20 @@ def run_rlg_dashboard(start_date, end_date, show_goals):
 
     # Compute all recent weeks (same logic)
     end_week = pd.to_datetime(end_date) - pd.to_timedelta(pd.to_datetime(end_date).weekday(), unit="D")
-    recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
 
-    # ✅ Keep only weeks on or after Oct 20
-    recent_weeks = [w for w in recent_weeks if w >= cutoff_date]
+    # Get all weeks that actually exist in the filtered data
+    all_weeks_in_data = sorted(filtered_team_hours["Week"].unique())
+
+    # Restrict only by cutoff_date
+    recent_weeks = [w for w in all_weeks_in_data if w >= cutoff_date]
+
+    # If the user only wants to show *last 6 actual weeks*:
+    recent_weeks = recent_weeks[-6:]
 
     # ✅ If everything gets filtered out (e.g., end_date < 20th), fallback to last 6 weeks
     if not recent_weeks:
-        recent_weeks = [end_week - pd.to_timedelta(7 * i, unit="D") for i in range(6)][::-1]
+    # fallback to the last 6 actual weeks in the dataset
+        recent_weeks = sorted(all_weeks_in_data)[-6:]
 
     # 5) Cross product: (recent weeks × all staff in settings)
     custom_staff_list = st.session_state["custom_staff_list"]
