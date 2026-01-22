@@ -17,9 +17,13 @@ try:
     )
     cursor = conn.cursor()
     print("Connected to SQL Server")
+    # ✅ Set Lock Timeout (10 seconds) to prevent hanging
+    cursor.execute("SET LOCK_TIMEOUT 10000;") 
+    print("Lock Timeout set to 10 seconds.")
+
 except Exception as e:
     print(f"Connection Failed: {e}")
-    exit()
+    exit(1)
 
 # ✅ Stored Procedures to Run (update tables before export)
 STORED_PROCS = {
@@ -51,15 +55,23 @@ os.makedirs(EXPORT_PATH, exist_ok=True)
 # --------------------------------------------------------------------
 # STEP 1: Run all stored procedures
 # --------------------------------------------------------------------
+# NOTE: TimeSolv SPs are now run via SQL Agent Job 'TimeSolv_Data_Load'
+# Uncomment below if you need to run them manually from this script
+"""
 print("Running stored procedures to refresh data...")
 for proc_key, proc_name in STORED_PROCS.items():
     try:
         print(f"Executing {proc_name}...")
         cursor.execute(f"EXEC {proc_name}")
-        cursor.commit()  # commit changes in case proc does inserts/updates
+        # cursor.commit()  # Not needed with autocommit=True, removing for clarity
         print(f"{proc_name} executed successfully")
     except Exception as e:
         print(f"Failed to execute {proc_name}: {e}")
+        # Detect Lock Timeout Error
+        if "1222" in str(e): # SQL Error 1222 is Lock Timeout
+            print("ALERT: Execution timed out due to a TABLE LOCK. Please check for open sessions blocking this table.")
+"""
+print("Skipping SP execution - handled by SQL Agent Job 'TimeSolv_Data_Load'")
 
 # --------------------------------------------------------------------
 # STEP 2: Export tables/views to CSV
@@ -83,37 +95,3 @@ cursor.close()
 conn.close()
 print("\n All Stored Procedures Executed and Exports Completed!")
 
-# # -----------------------------------------------------------------------
-# # STEP 3: Write setting.json
-# # -----------------------------------------------------------------------
-# print("\nBuilding settings.json from StaffGoalsSettings...")
-# try:
-#     # Pull StaffGoalsSettings table from SQL
-#     query = "SELECT StaffAbbreviation, WeeklyGoalHours FROM DW.dim.StaffGoalsSettings"
-#     df_goals = pd.read_sql_query(query, conn)
-
-#     # Convert staff abbreviations to list
-#     custom_staff_list = df_goals["StaffAbbreviation"].tolist()
-
-#     # Convert to dict of { StaffAbbreviation: WeeklyGoalHours }
-#     staff_weekly_goals = dict(zip(df_goals["StaffAbbreviation"], df_goals["WeeklyGoalHours"]))
-
-#     # Define static threshold values
-#     settings_json = {
-#         "treshold_hours": 185,
-#         "treshold_revenue": 2200000,
-#         "custom_staff_list": custom_staff_list,
-#         "staff_weekly_goals": staff_weekly_goals
-#     }
-
-#     # Define file path
-#     settings_path = os.path.join(EXPORT_PATH, "settings.json")
-
-#     # Write JSON file
-#     with open(settings_path, "w", encoding="utf-8") as f:
-#         json.dump(settings_json, f, indent=4)
-
-#     print(f"settings.json created successfully at: {settings_path}")
-
-# except Exception as e:
-#     print(f"Failed to create settings.json: {e}")
