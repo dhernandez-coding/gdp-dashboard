@@ -90,4 +90,14 @@ export const updatePrebills = async (prebills) => {
     return response.data;
 };
 
+export const getFlatMatterNotifications = async () => {
+    const response = await api.get('/notifications/flat-matters');
+    return response.data;
+};
+
+export const syncData = async () => {
+    const response = await api.post('/data/sync');
+    return response.data;
+};
+
 export default api;

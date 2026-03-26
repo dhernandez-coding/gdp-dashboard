@@ -1,47 +1,61 @@
 .kpi-card {
-    background: white;
-    border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
-    transition: transform 0.2s;
+    gap: 1.25rem;
+    position: relative;
+    overflow: hidden;
 }
 
-.kpi-card:hover {
-    transform: translateY(-4px);
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary-gradient);
+    opacity: 0.8;
 }
 
 .kpi-icon-container {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 12px;
-    background: linear-gradient(135deg, rgba(57, 157, 183, 0.1) 0%, rgba(5, 43, 72, 0.1) 100%);
+    background: rgba(100, 255, 218, 0.1);
     display: flex;
     justify-content: center;
     align-items: center;
+    border: 1px solid var(--border-color);
 }
 
 .kpi-icon {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+}
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
 }
 
 .kpi-title {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
-    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     margin-bottom: 0.25rem;
 }
 
 .kpi-value {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 700;
-    color: var(--dark-blue);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: -1px;
 }
 
 .kpi-subtitle {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    font-size: 0.7rem;
+    color: var(--text-accent);
+    margin-top: -2px;
 }

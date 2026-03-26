@@ -1,17 +1,30 @@
 .header {
-    height: 64px;
-    background-color: white;
-    border-bottom: 1px solid var(--border-color);
+    height: 70px;
+    margin: 1rem 1rem 0 1rem;
+    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 2rem;
-    z-index: 100;
+    z-index: 1000;
+    border-radius: var(--radius-md) !important;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-logo {
+    height: 40px;
+    width: auto;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
 }
 
 .header-title {
-    color: var(--dark-blue);
-    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    letter-spacing: -0.5px;
 }
 
 .header-right {
@@ -22,16 +35,19 @@
 
 .user-welcome {
     color: var(--text-secondary);
-    font-weight: 500;
+    font-size: 0.9rem;
 }
 
 .btn-logout {
-    background: none;
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
     color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
 }
 
 .btn-logout:hover {
-    background-color: #f1f5f9;
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-accent);
+    border-color: var(--text-accent);
 }

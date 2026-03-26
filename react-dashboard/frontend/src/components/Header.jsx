@@ -5,8 +5,9 @@ const Header = () => {
     const { user, logout } = useAuth();
 
     return (
-        <header className="header">
+        <header className="header glass-card">
             <div className="header-left">
+                <img src="/assets/logo-symbol.webp" alt="RLG Logo" className="header-logo" />
                 <h2 className="header-title">RLG Dashboard</h2>
             </div>
             <div className="header-right">

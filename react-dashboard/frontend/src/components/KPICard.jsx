@@ -2,7 +2,7 @@ import './KPICard.css';
 
 const KPICard = ({ title, value, subtitle, icon }) => {
     return (
-        <div className="kpi-card">
+        <div className="kpi-card glass-card">
             <div className="kpi-icon-container">
                 <span className="kpi-icon">{icon}</span>
             </div>

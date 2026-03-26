@@ -7,11 +7,11 @@ const Sidebar = ({ dateRange, setDateRange, showGoals, setShowGoals, onReloadDat
     const allowedTabs = user?.allowed_tabs || [];
 
     return (
-        <div className="sidebar">
+        <div className="sidebar glass-card">
             <div className="sidebar-segment">
                 <h3 className="sidebar-label">Navigation</h3>
                 <nav className="nav-links">
-                    {allowedTabs.includes('Dashboard') && (
+                    {allowedTabs.includes('RLGDashboard') && (
                         <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             RLG Dashboard
                         </NavLink>

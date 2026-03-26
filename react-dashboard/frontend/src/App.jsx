@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { getAllData, getSettings } from './services/api';
+import { getAllData, getSettings, getFlatMatterNotifications } from './services/api';
 
 // Components
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import NotificationToast from './components/NotificationToast';
 
 // Pages
 import Login from './pages/Login';
@@ -28,6 +29,7 @@ function App() {
     const { user } = useAuth();
     const [data, setData] = useState(null);
     const [settings, setSettings] = useState(null);
+    const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showGoals, setShowGoals] = useState(true);
     const [dateRange, setDateRange] = useState({
@@ -38,14 +40,18 @@ function App() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [allData, settingsData] = await Promise.all([
+            const [allData, settingsData, notificationsData] = await Promise.all([
                 getAllData(),
-                getSettings()
+                getSettings(),
+                getFlatMatterNotifications()
             ]);
             setData(allData);
             setSettings(settingsData);
+            if (notificationsData && notificationsData.notifications) {
+                setNotifications(notificationsData.notifications);
+            }
         } catch (error) {
-            console.error('Error fetching data:', error);
+            console.error('App Fetch Error:', error);
         } finally {
             setLoading(false);
         }
@@ -101,6 +107,10 @@ function App() {
                     }
                 />
             </Routes>
+            <NotificationToast
+                notifications={notifications}
+                onClose={() => setNotifications([])}
+            />
         </div>
     );
 }

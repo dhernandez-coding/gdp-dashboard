@@ -40,6 +40,7 @@ def login():
                     st.session_state["authenticated"] = True
                     st.session_state["username"] = email
                     st.session_state["allowed_tabs"] = user_data["allowed_tabs"]
+                    st.session_state["staff_code"] = user_data.get("staff_code", "")
                     st.rerun()
                 else:
                     st.error("Incorrect password.")
@@ -51,6 +52,6 @@ def login():
 def logout():
     st.sidebar.divider()
     if st.sidebar.button("Logout"):
-        for key in ["authenticated", "username", "allowed_tabs"]:
+        for key in ["authenticated", "username", "allowed_tabs", "staff_code"]:
             st.session_state.pop(key, None)
         st.rerun()

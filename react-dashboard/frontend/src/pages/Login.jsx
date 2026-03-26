@@ -28,12 +28,13 @@ const Login = () => {
     return (
         <div className="login-page">
             <div className="login-card card">
+                <img src="/assets/logo-symbol.webp" alt="RLG Logo" className="login-logo" />
                 <h1>RLG Dashboard</h1>
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label>Email</label>
                         <input
-                            type="email"
+                            type="text"
                             className="input"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}

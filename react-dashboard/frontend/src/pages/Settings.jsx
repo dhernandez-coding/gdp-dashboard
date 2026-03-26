@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSettings, updateSettings, getPrebills, updatePrebills, getBillableHours } from '../services/api';
+import { getSettings, updateSettings, getPrebills, updatePrebills, getBillableHours, syncData } from '../services/api';
 import './Settings.css';
 
 const Settings = () => {
@@ -9,6 +9,7 @@ const Settings = () => {
     const [loading, setLoading] = useState(true);
     const [savingSettings, setSavingSettings] = useState(false);
     const [savingPrebills, setSavingPrebills] = useState(false);
+    const [syncing, setSyncing] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -24,8 +25,12 @@ const Settings = () => {
                 ]);
                 setSettings(settingsData);
                 setPrebills(prebillsData);
-                const uniqueStaff = [...new Set(billableHours.map(h => h.StaffAbbreviation))].filter(Boolean).sort();
-                setAllStaff(uniqueStaff);
+                if (Array.isArray(billableHours)) {
+                    const uniqueStaff = [...new Set(billableHours.map(h => h.StaffAbbreviation))].filter(Boolean).sort();
+                    setAllStaff(uniqueStaff);
+                } else {
+                    console.error('billableHours is not an array:', billableHours);
+                }
             } catch (err) {
                 console.error('Failed to load settings:', err);
             } finally {
@@ -83,6 +88,20 @@ const Settings = () => {
         }
     };
 
+    const handleSync = async () => {
+        try {
+            setSyncing(true);
+            setMessage({ text: 'Syncing data from GitHub...', type: 'info' });
+            await syncData();
+            setMessage({ text: 'Data synced successfully! Please refresh or reload to see updates.', type: 'success' });
+        } catch (err) {
+            console.error('Sync failed:', err);
+            setMessage({ text: 'Failed to sync data from GitHub', type: 'error' });
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     if (loading) return <div className="loading-container"><div className="spinner"></div></div>;
 
     return (
@@ -91,7 +110,7 @@ const Settings = () => {
             {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
 
             <div className="settings-grid">
-                <section className="settings-section card">
+                <section className="settings-section glass-card">
                     <h3>Staff Selection</h3>
                     <div className="staff-checkbox-grid">
                         {allStaff.map(staff => (
@@ -103,18 +122,47 @@ const Settings = () => {
                     </div>
                 </section>
 
-                <section className="settings-section card">
+                <section className="settings-section glass-card">
+                    <h3>Weekly Goals per Staff</h3>
+                    {settings.custom_staff_list.length > 0 ? (
+                        <div className="weekly-goals-grid">
+                            {settings.custom_staff_list.map(staff => (
+                                <div key={staff} className="goal-input-group">
+                                    <label>{staff}</label>
+                                    <input
+                                        type="number"
+                                        className="input goal-input"
+                                        min="0"
+                                        max="60"
+                                        value={settings.staff_weekly_goals[staff] || 20}
+                                        onChange={(e) => handleGoalChange(staff, e.target.value)}
+                                    />
+                                    <span className="goal-unit">hours</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="info-text">Select at least one staff member to set weekly goals.</p>
+                    )}
+                </section>
+
+                <section className="settings-section glass-card">
                     <h3>Team Goals</h3>
                     <div className="form-group">
                         <label>Total Revenue Goal ($)</label>
                         <input type="number" className="input" value={settings.treshold_revenue} onChange={(e) => setSettings({ ...settings, treshold_revenue: parseInt(e.target.value) || 0 })} />
                     </div>
                     <p>Calculated Weekly Hours Goal: <strong>{settings.treshold_hours}</strong></p>
-                    <button className="btn btn-primary" onClick={saveSettings} disabled={savingSettings}>{savingSettings ? 'Saving...' : '💾 Save Settings'}</button>
+                    <div className="button-group">
+                        <button className="btn btn-primary" onClick={saveSettings} disabled={savingSettings}>{savingSettings ? 'Saving...' : '💾 Save Settings'}</button>
+                        <button className="btn btn-secondary mt-2" onClick={handleSync} disabled={syncing}>
+                            {syncing ? '🔄 Syncing...' : '☁️ Sync Data from GitHub'}
+                        </button>
+                    </div>
                 </section>
             </div>
 
-            <section className="settings-section card mt-4">
+            <section className="settings-section glass-card mt-4">
                 <h3>Prebills Back On Time</h3>
                 <div className="table-responsive">
                     <table className="prebills-table">

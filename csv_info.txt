@@ -1,0 +1,22 @@
+--- vBillableHoursStaff ---
+BillableHoursAmount
+StaffAbbreviation
+BillableHoursDate
+MatterName
+
+--- vwFlatMatters ---
+MatterTypeID
+MatterSourceID
+MatterName
+LastInvoiceAmount
+
+--- vMatters ---
+MatterID
+MatterClientID
+MatterTypeID
+MatterName
+MatterCreationDate
+orig_staff1
+orig_staff2
+orig_staff3
+

@@ -4,3 +4,5 @@ flask-jwt-extended
 pandas
 python-dotenv
 pytz
+requests
+gunicorn

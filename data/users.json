@@ -1,50 +1,50 @@
 {
-    "Jeffrey@ResolutionLegal.com": {
+    "jeffrey@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "JER"
     },
-    "Kevin@ResolutionLegal.com": {
+    "kevin@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "KWD"
     },
-    "Crystal@ResolutionLegal.com": {
+    "crystal@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "CAJ"
     },
-    "Trey@ResolutionLegal.com": {
+    "trey@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "TGF"
     },
-    "Jim@ResolutionLegal.com": {
+    "jim@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "JMG"
     },
-    "Jason@ResolutionLegal.com": {
+    "jason@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard", "RevShare"],
         "staff_code": "JRJ"
     },
-    "Bruce@ResolutionLegal.com": {
+    "bruce@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "BPL"
     },
-    "Anne@ResolutionLegal.com": {
+    "anne@resolutionlegal.com": {
         "password": "rlg123",
         "allowed_tabs": ["RLGDashboard"],
         "staff_code": "AEZ"
     },
-    "Russell@ResolutionLegal.com": {
+    "russell@resolutionlegal.com": {
         "password": "admin",
         "allowed_tabs": ["RLGDashboard", "Settings", "RevShare"],
         "staff_code": "RAW"
     },
-    "Donna@ResolutionLegal.com": {
+    "donna@resolutionlegal.com": {
         "password": "admin",
         "allowed_tabs": ["RLGDashboard", "Settings", "RevShare"],
         "staff_code": "DLB"

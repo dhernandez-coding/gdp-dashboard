@@ -37,7 +37,16 @@ revshare, TETypeI,TETypeII,TETypeIII =load_data()
 
 def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETypeII=TETypeII, TETypeIII=TETypeIII):
     st.title("Revenue Share Review")
+    st.caption("v2.1 - Enhanced Table Formatting")
     custom_staff_list = st.session_state["custom_staff_list"]
+    # Retrieve user role/permissions
+    staff_code = st.session_state.get("staff_code", "")
+    allowed_tabs = st.session_state.get("allowed_tabs", [])
+
+    # Identify if user is admin (based on specific staff codes or admin role)
+    # RAW = Russell, DLB = Donna. You can also check if "Settings" is in allowed_tabs as a proxy for admin.
+    is_admin = (staff_code in ["RAW", "DLB", "admin"]) or ("Settings" in allowed_tabs)
+
     # Set up top KPIs with placeholders
     col1, col2, col3 = st.columns(3)
     kpi_revenue = col1.empty()
@@ -47,11 +56,23 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
 
     st.markdown("---")
 
-    #  Step 1: Staff dropdown
-    staff_selected = st.selectbox("Select Staff", custom_staff_list)
+    #  Step 1: Staff dropdown logic
+    if is_admin:
+        # Admins see everyone
+        staff_selected = st.selectbox("Select Staff", custom_staff_list)
+    else:
+        # Restrict to their own code
+        # If their staff_code is not in the list (e.g. data missing), default to it anyway or handle error
+        if staff_code in custom_staff_list:
+            # We can show a disabled selectbox or just a markdown
+            # st.markdown(f"**Viewing data for:** {staff_code}")
+            staff_selected = st.selectbox("Select Staff", [staff_code], disabled=True)
+        else:
+            st.error(f"Staff code '{staff_code}' not found in configuration.")
+            st.stop()
 
 
-    # Step 2: Filter and rename RevShare table
+    # Step 2: Filter and RevShare table
     filtered_rev = (
         revshare[
             (revshare["RevShareDate"] >= pd.to_datetime(start_date)) &
@@ -60,55 +81,86 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
         ]
         .drop(columns=[col for col in revshare.columns if col.startswith("Unnamed")])
         .sort_values("RevShareDate")
-        .rename(columns={
-            "RevShareMonth": "Month",
-            "RevShareYear": "Year",
-            "RevShareDate": "Date",
-            "Staff": "Staff",
-            "FMONHours": "FMON Hours",
-            "FMONRevenue": "FMON Revenue",
-            "FONEHours": "FONE Hours",
-            "FONERevenue": "FONE Revenue",
-            "HourlyHours": "Hourly Hours",
-            "HourlyRevenue": "Hourly Revenue",
-            "TotalRevShareMonth": "Total Production Revenue",
-            "RevTier1": "Tier 1",
-            "RevTier2": "Tier 2",
-            "RevTier3": "Tier 3",
-            "RevTierTotal": "Total Tiers",
-            "OriginationFees": "Origination Revenue Share",
-            "RevShareTotal": "Total Revenue Share"
-        })
     )
-    # Step 3: Add Production Revenue Share
-    filtered_rev["Production Revenue Share"] = (filtered_rev["Tier 1"] + filtered_rev["Tier 2"] +  filtered_rev["Tier 3"])
+
+    # Calculate new columns
+    filtered_rev["Flat Fee Hours"] = filtered_rev["FONEHours"] + filtered_rev["FMONHours"]
+    filtered_rev["Flat Fee Revenue"] = filtered_rev["FONERevenue"] + filtered_rev["FMONRevenue"]
+    filtered_rev["Threshold"] = 14000.0
+    filtered_rev["Eligible for Revenue Share"] = (filtered_rev["TotalRevShareMonth"] - filtered_rev["Threshold"]).clip(lower=0)
+
+
+    # Rename columns
+    filtered_rev = filtered_rev.rename(columns={
+        "RevShareMonth": "Month",
+        "RevShareYear": "Year",
+        "RevShareDate": "Date",
+        "AverageRate": "Average Collection Rate",
+        "HourlyHours": "Hourly Hours Collected",
+        "HourlyRevenue": "Hourly Revenue",
+        "TotalRevShareMonth": "Total Production Revenue",
+        "RevTier1": "Tier 1 Share",
+        "RevTier2": "Tier 2 Share",
+        "RevTier3": "Tier 3 Share",
+        "RevTierTotal": "Production Revenue Share",
+        "OriginationFees": "Origination Revenue Share",
+        "RevShareTotal": "Total Revenue Share"
+    })
+    
     # Step 4: Reorder columns explicitly
     desired_order = [
-        "Year",
-        "Month",
-        "Date",
         "Staff",
-        "FMON Hours",
-        "FMON Revenue",
-        "FONE Hours",
-        "FONE Revenue",
-        "Hourly Hours",
+        "Month", # Or Date if prefer full date
+        # "Date", 
+        "Flat Fee Hours",
+        "Average Collection Rate",
+        "Flat Fee Revenue",
+        "Hourly Hours Collected",
         "Hourly Revenue",
         "Total Production Revenue",
-        "Tier 1",
-        "Tier 2",
-        "Tier 3",
-        "Total Tiers",
+        "Threshold",
+        "Eligible for Revenue Share",
+        "Tier 1 Share",
+        "Tier 2 Share",
+        "Tier 3 Share",
         "Production Revenue Share",
         "Origination Revenue Share",
         "Total Revenue Share"
     ]
 
-    # Ensure all desired columns are in filtered_rev before reordering
+    # Use Date for display in Month column if needed, or just keep Month as digit. 
+    # Use "Date" column content for "Month" column display if desired to match screenshot (10/01/2023)
+    # The user screenshot shows "Month" with values like "10/01/2023".
+    # Lets copy Date to Month or just use Date column renamed.
+    # The rename above maps "RevShareMonth" to "Month" which is just the integer. 
+    # Let's map "Date" to "Month" for the display.
+    filtered_rev["Month"] = filtered_rev["Date"].dt.strftime("%m/%d/%Y")
+
+    # Ensure all desired columns are in filtered_rev
     filtered_rev = filtered_rev[[col for col in desired_order if col in filtered_rev.columns]]
-    display_rev = format_as_money(filtered_rev.copy(), ["FONE Revenue","FMON Revenue","Hourly Revenue","Total Production Revenue", "Total Revenue Share", "Origination Revenue Share", "Total Tiers","Tier 1", "Tier 2", "Tier 3", "Production Revenue Share"])
+    
+    # Format Money
+    money_cols = [
+        "Average Collection Rate",
+        "Flat Fee Revenue",
+        "Hourly Revenue",
+        "Total Production Revenue",
+        "Threshold",
+        "Eligible for Revenue Share",
+        "Tier 1 Share",
+        "Tier 2 Share",
+        "Tier 3 Share",
+        "Production Revenue Share",
+        "Origination Revenue Share",
+        "Total Revenue Share"
+    ]
+    display_rev = format_as_money(filtered_rev.copy(), money_cols)
+    
     st.subheader(f"Revenue Share Summary:")
-    st.dataframe(display_rev, use_container_width=True, height=250) # Here is the visual for the table
+    st.dataframe(display_rev, use_container_width=True, height=250) 
+    
+    total_share_val = filtered_rev["Total Revenue Share"].sum()
+    st.subheader(f"Total Share: ${total_share_val:,.2f}")
 
     #  Step 5: Define reusable settings for FONE, FMON and Hourly
     col_renames = {
@@ -126,7 +178,7 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
     }
     selected_cols = list(col_renames.values())
 
-    # Step 4: Loop over each Time Entry type
+    # Step 4: Loop over each Time Entry type (HIDDEN FOR NOW)
     # Mapping from internal labels to user-friendly names
     label_map = {
         "Type I": "FONE",
@@ -152,11 +204,11 @@ def run_revshare(start_date, end_date, revshare=revshare, TETypeI=TETypeI, TETyp
 
         # Keep only relevant columns
         filtered_te = filtered_te[selected_cols]
-        display_te = format_as_money(filtered_te.copy(), ["Rate", "Gross", "Billed Amount", "Total Payout"])
-        # Display
+        # display_te = format_as_money(filtered_te.copy(), ["Rate", "Gross", "Billed Amount", "Total Payout"])
+        # Display - HIDDEN
         friendly_label = label_map[label]
-        st.subheader(f"{friendly_label} Time Entries")
-        st.dataframe(display_te, use_container_width=True, height=300)
+        # st.subheader(f"{friendly_label} Time Entries")
+        # st.dataframe(display_te, use_container_width=True, height=300)
 
         # Add for summary plot
         if not filtered_te.empty:

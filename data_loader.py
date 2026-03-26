@@ -10,6 +10,7 @@ def load_data():
     revenue = pd.read_csv(data_path / "RevShareNewLogic.csv", encoding="utf-8")
     billable_hours = pd.read_csv(data_path / "vBillableHoursStaff.csv", encoding="utf-8")
     matters = pd.read_csv(data_path / "vMatters.csv", encoding="utf-8")
+    flat_matters = pd.read_csv(data_path / "vwFlatMatters.csv", encoding="utf-8")
 
     # --- Parse dates first ---
     revenue["RevShareDate"] = pd.to_datetime(revenue["RevShareDate"], errors="coerce")
@@ -48,6 +49,7 @@ def load_data():
     revenue = clean_numeric(revenue, exclude_cols=["RevShareDate"])
     billable_hours = clean_numeric(billable_hours, exclude_cols=["BillableHoursDate"])
     matters = clean_numeric(matters, exclude_cols=["MatterCreationDate"])
+    flat_matters = clean_numeric(flat_matters)
 
     # --- Drop rows with invalid dates ---
     revenue = revenue.dropna(subset=["RevShareDate"])
@@ -74,7 +76,8 @@ def load_data():
         data_path / "RevShareNewLogic.csv",
         data_path / "vBillableHoursStaff.csv",
         data_path / "vMatters.csv",
+        data_path / "vwFlatMatters.csv",
     ]
     mtime_key = tuple(f.stat().st_mtime for f in csv_files)
 
-    return revenue, billable_hours, matters, mtime_key
+    return revenue, billable_hours, matters, flat_matters, mtime_key

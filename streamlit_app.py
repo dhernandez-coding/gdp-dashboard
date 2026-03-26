@@ -74,7 +74,7 @@ else:
 # ----------------------------------------------------------------------------
 
 # ✅ Load Data
-revenue, billable_hours, matters, mtime_key = load_data()
+revenue, billable_hours, matters, flat_matters, mtime_key = load_data()
 
 # ----------------------------------------------------------------------------
 # ✅ HEADER WITH COMPANY LOGO
