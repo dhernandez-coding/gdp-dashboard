@@ -420,6 +420,19 @@ def health():
     return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
+    # Sync data on startup in production/local if needed
+    try:
+        print("Auto-syncing data on startup...")
+        sync_from_github()
+    except Exception as e:
+        print(f"Startup sync failed: {e}")
     app.run(debug=True, port=5000)
+else:
+    # This block runs when starting with gunicorn
+    try:
+        print("Gunicorn startup: Auto-syncing data...")
+        sync_from_github()
+    except Exception as e:
+        print(f"Gunicorn startup sync failed: {e}")
 
 
